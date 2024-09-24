@@ -1,8 +1,10 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
 	"knowledgeMart/controllers"
+	"knowledgeMart/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 func RegisterRoutes(router *gin.Engine) {
@@ -18,4 +20,11 @@ func RegisterRoutes(router *gin.Engine) {
 	router.POST("/user_login", controllers.EmailLogin)
 
 	router.GET("/verifyemail/:email/:otp", controllers.VarifyEmail)
+
+	protected := router.Group("/user")
+	protected.Use(middleware.AuthRequired)
+	{
+		protected.POST("/seller_registration", controllers.SellerRegister)
+		//protected.GET("/profile", controllers.UserProfile)
+	}
 }

@@ -20,5 +20,9 @@ func ConnectDB() {
 	} else {
 		fmt.Println("connection to database :OK")
 	}
-	DB.AutoMigrate(&models.Admin{}, &models.User{})
+	DB.AutoMigrate(
+		&models.Admin{},
+		&models.User{},
+		&models.Seller{},
+	)
 }

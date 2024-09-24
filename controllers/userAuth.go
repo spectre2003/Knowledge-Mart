@@ -9,6 +9,7 @@ import (
 	//"github.com/joho/godotenv"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"knowledgeMart/utils"
 	"math/rand"
 	"net/http"
 	"net/smtp"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
@@ -79,6 +81,7 @@ func EmailSignup(c *gin.Context) {
 				"status":  false,
 				"message": "failed to create a new user",
 			})
+			fmt.Println(tx.Error)
 			return
 		}
 	} else {
@@ -90,7 +93,7 @@ func EmailSignup(c *gin.Context) {
 	}
 	err = sendOTPEmail(User.Email, otp)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Error sending OTP"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
@@ -147,10 +150,23 @@ func EmailLogin(c *gin.Context) {
 		})
 		return
 	}
+
+	token, err := utils.GenerateJWT(User.ID, User.Email, "user")
+	if token == "" || err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to generate token",
+		})
+		return
+	}
+
+	fmt.Println(token)
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
 		"message": "Login successful",
 		"data": gin.H{
+			"token":        token,
 			"name":         User.Name,
 			"email":        User.Email,
 			"phone_number": User.PhoneNumber,
@@ -165,23 +181,29 @@ func EmailLogin(c *gin.Context) {
 
 func sendOTPEmail(to string, otp uint64) error {
 	from := "knowledgemartv01@gmail.com"
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println("Error loading .env file")
+	}
 	appPassword := os.Getenv("SMTPAPP")
+	fmt.Println(from)
 
 	auth := smtp.PlainAuth("", from, appPassword, "smtp.gmail.com")
 
 	msg := []byte("Subject: Verify your email\n\n" +
 		fmt.Sprintf("Your OTP is %d", otp))
-	err := smtp.SendMail("smtp.gmail.com:587", auth, from, []string{to}, msg)
+	err = smtp.SendMail("smtp.gmail.com:587", auth, from, []string{to}, msg)
 	fmt.Println("send OTP:", otp)
 	if err != nil {
-		return errors.New("failed to send email")
+		fmt.Printf("Error in sending email: %v\n", err)
+		return errors.New("failed to send email ")
 	}
 	return nil
 
 }
 
 func VarifyEmail(c *gin.Context) {
-	// Use c.Query to retrieve query parameters, not c.Param
+
 	email := c.Query("email")
 	otpParam := c.Query("otp")
 
@@ -190,7 +212,6 @@ func VarifyEmail(c *gin.Context) {
 	fmt.Println("Received email:", email)
 	fmt.Println("Received OTP:", otpParam)
 
-	// Convert otpParam to integer
 	otp, err := strconv.Atoi(otpParam)
 	if err != nil || email == "" || otp == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -206,13 +227,11 @@ func VarifyEmail(c *gin.Context) {
 		return
 	}
 
-	// Compare OTP and check expiration
 	if User.OTP != uint64(otp) || time.Now().After(User.OTPExpiry) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid or expired OTP"})
 		return
 	}
 
-	// Update user as verified
 	User.IsVerified = true
 	if err := database.DB.Save(&User).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to update user verification status"})

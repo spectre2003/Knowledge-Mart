@@ -12,3 +12,8 @@ type EmailLoginRequest struct {
 	Email    string `form:"email" validate:"required,email" json:"email"`
 	Password string `form:"password" validate:"required" json:"password"`
 }
+
+type SellerRegisterRequest struct {
+	Name        string `validate:"required" json:"name"`
+	Description string `validate:"required" json:"description"`
+}
