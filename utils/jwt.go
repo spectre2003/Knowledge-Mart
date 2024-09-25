@@ -3,38 +3,47 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
+func init() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
+
 type JWTClaims struct {
-	UserID uint   `json:"userId"`
-	Role   string `json:"role"`
-	Email  string `json:"email"`
+	ID   uint   `json:"userId"`
+	Role string `json:"role"`
+	//Email string `json:"email"`
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(userID uint, email string, role string) (string, error) {
+func GenerateJWT(userID uint, role string) (string, error) {
 	secret := os.Getenv("JWTSECRET")
 
 	expirationTime := time.Now().Add(150 * time.Hour)
 
 	fmt.Println("user id :", userID)
-	fmt.Println("user id :", email)
+	//fmt.Println("user id :", email)
 
 	claims := &JWTClaims{
-		UserID: userID,
-		Email:  email,
-		Role:   role,
+		ID: userID,
+		//	Email:  email,
+		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	fmt.Println("user id :", claims.UserID, claims.Email)
+	//fmt.Println("user id :", claims.UserID, claims.Email)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(secret))
@@ -57,6 +66,9 @@ func ValidateJWT(tokenString string) (*JWTClaims, error) {
 	}
 
 	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+		if claims.ExpiresAt.Before(time.Now()) {
+			return nil, errors.New("token expired")
+		}
 		return claims, nil
 	}
 

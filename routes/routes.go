@@ -21,10 +21,30 @@ func RegisterRoutes(router *gin.Engine) {
 
 	router.GET("/verifyemail/:email/:otp", controllers.VarifyEmail)
 
-	protected := router.Group("/user")
-	protected.Use(middleware.AuthRequired)
+	router.POST("/seller_login", controllers.SellerLogin)
+
+	router.GET("/All_Products", controllers.ListAllProduct)
+
+	userRoutes := router.Group("/user")
+	userRoutes.Use(middleware.AuthRequired)
 	{
-		protected.POST("/seller_registration", controllers.SellerRegister)
-		//protected.GET("/profile", controllers.UserProfile)
+		userRoutes.POST("/seller_registration", controllers.SellerRegister)
 	}
+
+	sellerRoutes := router.Group("/seller")
+	sellerRoutes.Use(middleware.AuthRequired)
+	{
+		sellerRoutes.POST("/add_product", controllers.AddProduct)
+		sellerRoutes.PATCH("/edit_product", controllers.EditProduct)
+		sellerRoutes.DELETE("/delete_product", controllers.DeleteProduct)
+	}
+
+	adminRoutes := router.Group("/admin")
+	adminRoutes.Use(middleware.AuthRequired)
+	{
+		adminRoutes.POST("/add_category", controllers.AddCatogory)
+		adminRoutes.PATCH("/edit_category", controllers.EditCategory)
+		adminRoutes.DELETE("/delete_category", controllers.DeleteCategory)
+	}
+
 }

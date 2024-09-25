@@ -20,21 +20,32 @@ func AuthRequired(c *gin.Context) {
 	}
 	tokenString := strings.TrimSpace(strings.Replace(authHeader, "Bearer", "", 1))
 	if tokenString == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token format"})
 		c.Abort()
 		return
 	}
 
 	claims, err := utils.ValidateJWT(tokenString)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": fmt.Sprintf("Token validation failed: %v", err)})
 		c.Abort()
 		return
 	}
 	fmt.Println(tokenString)
-	fmt.Println("Extracted UserID:", claims.UserID)
+	fmt.Println("Extracted UserID:", claims.ID)
 
-	c.Set("userID", claims.UserID)
+	switch claims.Role {
+	case "user":
+		c.Set("userID", claims.ID)
+	case "seller":
+		c.Set("sellerID", claims.ID)
+	case "admin":
+		c.Set("adminID", claims.ID)
+	default:
+		c.JSON(http.StatusForbidden, gin.H{"message": "Unauthorized role"})
+		c.Abort()
+		return
+	}
 
 	c.Next()
 }

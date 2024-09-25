@@ -24,5 +24,7 @@ func ConnectDB() {
 		&models.Admin{},
 		&models.User{},
 		&models.Seller{},
+		&models.Product{},
+		&models.Category{},
 	)
 }

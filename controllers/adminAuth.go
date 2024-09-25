@@ -4,6 +4,7 @@ import (
 	"errors"
 	"knowledgeMart/config"
 	"knowledgeMart/models"
+	"knowledgeMart/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -42,8 +43,17 @@ func AdminLogin(c *gin.Context) {
 		})
 		return
 	}
+	token, err := utils.GenerateJWT(admin.ID, "admin")
+	if token == "" || err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to generate token",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"token":   token,
 		"message": "login success",
 	})
 	//c.JSON(http.StatusSeeOther, gin.H{"redirect": "/admin-panel"})

@@ -3,6 +3,7 @@ package controllers
 import (
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"knowledgeMart/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,7 @@ func SellerRegister(c *gin.Context) {
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  false,
-			"message": "user not authorized",
+			"message": "user not authorized ",
 		})
 		return
 	}
@@ -89,7 +90,8 @@ func SellerRegister(c *gin.Context) {
 	// Create the new seller associated with the user
 	newSeller = models.Seller{
 		UserID:      userID.(uint), // Use extracted userID
-		Name:        Register.Name,
+		UserName:    Register.UserName,
+		Password:    Register.Password,
 		Description: Register.Description,
 		IsVerified:  false,
 	}
@@ -102,10 +104,76 @@ func SellerRegister(c *gin.Context) {
 		})
 		return
 	}
+	token, err := utils.GenerateJWT(seller.ID, "seller")
+	if token == "" || err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to generate token",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
-		"message": "Seller registered successfully",
+		"message": "Seller registered successfully  please login to continue",
+		"token":   token,
 		"data":    newSeller,
+	})
+}
+
+func SellerLogin(c *gin.Context) {
+	var LoginSeller models.SellerLoginRequest
+
+	if err := c.ShouldBindJSON(&LoginSeller); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+	Validate = validator.New()
+
+	err := Validate.Struct(LoginSeller)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	var seller models.Seller
+	tx := database.DB.Where("user_name = ? AND deleted_at is NULL", LoginSeller.UserName).First(&seller)
+	if tx.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "invalid email or password",
+		})
+		return
+	}
+	if seller.Password != LoginSeller.Password {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  false,
+			"message": "Incorrect password",
+		})
+		return
+	}
+	token, err := utils.GenerateJWT(seller.ID, "seller")
+	if token == "" || err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to generate token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "Seller Login successfully",
+		"data": gin.H{
+			"token":    token,
+			"username": seller.UserName,
+			"verified": seller.IsVerified,
+		},
 	})
 }

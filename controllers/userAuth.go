@@ -151,7 +151,7 @@ func EmailLogin(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateJWT(User.ID, User.Email, "user")
+	token, err := utils.GenerateJWT(User.ID, "user")
 	if token == "" || err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  false,

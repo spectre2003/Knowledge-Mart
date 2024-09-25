@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +34,40 @@ type Seller struct {
 	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID      uint   `gorm:"not null;constraint:OnDelete:CASCADE;" json:"userId"` // Foreign key for User
 	User        User   `gorm:"foreignKey:UserID"`                                   // Association to User
-	Name        string `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	UserName    string `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	Password    string `gorm:"type:varchar(255)" validate:"required" json:"password"`
 	Description string `gorm:"type:varchar(255)" validate:"required" json:"description"`
 	IsVerified  bool   `gorm:"type:bool" json:"verified"`
 }
+
+type Category struct {
+	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name        string `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	Description string `gorm:"type:varchar(255)" validate:"required" json:"description"`
+}
+
+type Product struct {
+	gorm.Model
+	ID           uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	SellerID     uint           `gorm:"not null;constraint:OnDelete:CASCADE;" json:"sellerId"`
+	Seller       Seller         `gorm:"foreignKey:SellerID"`
+	Name         string         `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	CategoryID   uint           `gorm:"not null;constraint:OnDelete:CASCADE;" json:"categoryId"`
+	Category     Category       `gorm:"foreignKey:CategoryID"`
+	Description  string         `gorm:"type:varchar(255)" validate:"required" json:"description"`
+	Availability bool           `gorm:"type:bool;default:true" json:"availability"`
+	Price        float64        `gorm:"type:decimal(10,2);not null" validate:"required" json:"price"`
+	Image        pq.StringArray `gorm:"type:varchar(255)[]" validate:"required" json:"image_url"`
+}
+
+// type Product struct {
+// 	gorm.Model
+// 	ID           uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+// 	SellerID     Seller         `gorm:"foreignKey:SellerID not null;constraint:OnDelete:CASCADE;" json:"sellerId"`
+// 	Name         string         `gorm:"type:varchar(255)" validate:"required" json:"name"`
+// 	CategoryID   Category       `gorm:"foreignKey:CategoryID not null;constraint:OnDelete:CASCADE;" json:"categoryId"`
+// 	Description  string         `gorm:"type:varchar(255)" validate:"required" json:"description"`
+// 	Availability bool           `gorm:"type:bool;default:true" json:"availability"`
+// 	Price        float64        `gorm:"type:decimal(10,2);not null" validate:"required" json:"price"`
+// 	Image        pq.StringArray `gorm:"type:varchar(255)[]" validate:"required" json:"image_url"`
+// }
