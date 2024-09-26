@@ -10,6 +10,43 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+func ListAllCategory(c *gin.Context) {
+	var Categories []models.Category
+
+	tx := database.DB.Select("*").Find(&Categories)
+
+	if tx.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  false,
+			"message": "failed to retrieve data from the database, or the product doesn't exist",
+		})
+		return
+	}
+
+	var categoryResponse []models.CatgoryResponse
+
+	for _, category := range Categories {
+		categoryResponse = append(categoryResponse, models.CatgoryResponse{
+			ID:          category.ID,
+			Name:        category.Name,
+			Description: category.Description,
+			Image:       category.Image,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "successfully retrieved products",
+		"data": gin.H{
+			"categories": categoryResponse,
+		},
+	})
+}
+
+// func ListCategoryProductList (c *gin.Context){
+// 	var  categories []models.Category
+
+// }
+
 func AddCatogory(c *gin.Context) {
 	var Request models.AddCategoryRequest
 
@@ -71,6 +108,7 @@ func AddCatogory(c *gin.Context) {
 	NewCategory := models.Category{
 		Name:        Request.Name,
 		Description: Request.Description,
+		Image:       Request.Image,
 	}
 
 	if err := database.DB.Save(&NewCategory).Error; err != nil {
@@ -133,6 +171,7 @@ func EditCategory(c *gin.Context) {
 		existCategory.Name = Request.Name
 	}
 	existCategory.Description = Request.Description
+	existCategory.Image = Request.Image
 
 	if err := database.DB.Save(&existCategory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -150,16 +189,17 @@ func EditCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
+	// Retrieve the adminID to verify authorization
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  false,
-			"message": "not authorized ",
+			"message": "not authorized",
 		})
 		return
 	}
 
-	categoryID, ok := adminID.(uint)
+	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  false,
@@ -168,32 +208,57 @@ func DeleteCategory(c *gin.Context) {
 		return
 	}
 
+	// Retrieve the categoryID from query parameters
+	categoryIDStr := c.Query("categoryid")
+	if categoryIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "categoryid is required",
+		})
+		return
+	}
+
 	var category models.Category
-
-	catergoryIDStr := c.Query("categoryid")
-
-	if err := database.DB.First(&category, categoryID).Error; err != nil {
+	// Fetch the category using the categoryID
+	if err := database.DB.First(&category, categoryIDStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  false,
 			"message": "failed to fetch category from the database",
 		})
 		return
 	}
+
+	// Check if there are products associated with this category
 	var productCount int64
-	if result := database.DB.Model(&models.Product{}).Where("category_id = ?", categoryID).Count(&productCount); result.RowsAffected > 0 {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{"status": false, "message": "category contains products, change the category of these products before using this endpoint"})
+	result := database.DB.Model(&models.Product{}).Where("category_id = ?", category.ID).Count(&productCount)
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to check products for this category",
+		})
 		return
 	}
-	if err := database.DB.Delete(&category, categoryID).Error; err != nil {
+
+	if productCount > 0 {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{
+			"status":  false,
+			"message": "category contains products, change the category of these products before using this endpoint",
+		})
+		return
+	}
+
+	// Delete the category from the database
+	if err := database.DB.Delete(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  false,
 			"message": "failed to delete category from the database",
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
-		"message": "Successfully deleted category from the database",
+		"message": "successfully deleted category from the database",
 	})
-
 }

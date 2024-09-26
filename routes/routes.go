@@ -20,10 +20,12 @@ func RegisterRoutes(router *gin.Engine) {
 	router.POST("/user_login", controllers.EmailLogin)
 
 	router.GET("/verifyemail/:email/:otp", controllers.VarifyEmail)
+	router.POST("/resend_otp/:email", controllers.ResendOTP)
 
 	router.POST("/seller_login", controllers.SellerLogin)
 
 	router.GET("/All_Products", controllers.ListAllProduct)
+	router.GET("/all_category", controllers.ListAllCategory)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.AuthRequired)
@@ -35,7 +37,7 @@ func RegisterRoutes(router *gin.Engine) {
 	sellerRoutes.Use(middleware.AuthRequired)
 	{
 		sellerRoutes.POST("/add_product", controllers.AddProduct)
-		sellerRoutes.PATCH("/edit_product", controllers.EditProduct)
+		sellerRoutes.PUT("/edit_product", controllers.EditProduct)
 		sellerRoutes.DELETE("/delete_product", controllers.DeleteProduct)
 	}
 
@@ -43,8 +45,15 @@ func RegisterRoutes(router *gin.Engine) {
 	adminRoutes.Use(middleware.AuthRequired)
 	{
 		adminRoutes.POST("/add_category", controllers.AddCatogory)
-		adminRoutes.PATCH("/edit_category", controllers.EditCategory)
+		adminRoutes.PUT("/edit_category", controllers.EditCategory)
 		adminRoutes.DELETE("/delete_category", controllers.DeleteCategory)
+		adminRoutes.GET("/all_users", controllers.ListAllUsers)
+		adminRoutes.GET("/list_blocked_users", controllers.ListBlockedUsers)
+		adminRoutes.PATCH("/block_user", controllers.BlockUser)
+		adminRoutes.PATCH("/unblock_user", controllers.UnBlockUser)
+		adminRoutes.GET("/all_seller", controllers.ListAllSellers)
+		adminRoutes.PATCH("/verify_seller", controllers.VerifySeller)
+		adminRoutes.PATCH("/not_verified_seller", controllers.NotVerifySeller)
 	}
 
 }

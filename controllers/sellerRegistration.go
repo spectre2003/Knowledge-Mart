@@ -86,12 +86,20 @@ func SellerRegister(c *gin.Context) {
 		})
 		return
 	}
+	hashpassword, err := HashPassword(Register.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "error in password hashing" + err.Error(),
+		})
+		return
+	}
 
 	// Create the new seller associated with the user
 	newSeller = models.Seller{
-		UserID:      userID.(uint), // Use extracted userID
+		UserID:      userID.(uint),
 		UserName:    Register.UserName,
-		Password:    Register.Password,
+		Password:    hashpassword,
 		Description: Register.Description,
 		IsVerified:  false,
 	}
@@ -115,7 +123,7 @@ func SellerRegister(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
-		"message": "Seller registered successfully  please login to continue",
+		"message": "Seller registered successfully ,status is pending , please login to continue",
 		"token":   token,
 		"data":    newSeller,
 	})
@@ -151,13 +159,30 @@ func SellerLogin(c *gin.Context) {
 		})
 		return
 	}
-	if seller.Password != LoginSeller.Password {
+	err = CheckPassword(seller.Password, LoginSeller.Password)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  false,
 			"message": "Incorrect password",
 		})
 		return
 	}
+	// if seller.Password != LoginSeller.Password {
+	// 	c.JSON(http.StatusUnauthorized, gin.H{
+	// 		"status":  false,
+	// 		"message": "Incorrect password",
+	// 	})
+	// 	return
+	// }
+	if !seller.IsVerified {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  false,
+			"message": "seller is not verified , status is pending ",
+		})
+		return
+	}
+
 	token, err := utils.GenerateJWT(seller.ID, "seller")
 	if token == "" || err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

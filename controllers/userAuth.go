@@ -19,12 +19,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 var Validate *validator.Validate
 
 func EmailSignup(c *gin.Context) {
+
 	var Signup models.EmailSignupRequest
 
 	if err := c.ShouldBindJSON(&Signup); err != nil {
@@ -52,16 +54,23 @@ func EmailSignup(c *gin.Context) {
 		})
 		return
 	}
+	hashpassword, err := HashPassword(Signup.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "error in password hashing" + err.Error(),
+		})
+		return
+	}
 
-	otp := uint64(rand.Intn(900000) + 100000)
-	otpExpiry := time.Now().Add(10 * time.Minute)
+	otp, otpExpiry := GenerateOTP()
 
 	User := models.User{
 		Name:        Signup.Name,
 		Email:       Signup.Email,
 		PhoneNumber: Signup.PhoneNumber,
 		Blocked:     false,
-		Password:    Signup.Password,
+		Password:    hashpassword,
 		OTP:         otp,
 		OTPExpiry:   otpExpiry,
 		IsVerified:  false,
@@ -143,10 +152,27 @@ func EmailLogin(c *gin.Context) {
 		return
 	}
 
-	if User.Password != LoginRequest.Password {
+	err = CheckPassword(User.Password, LoginRequest.Password)
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  false,
 			"message": "Incorrect password",
+		})
+		return
+	}
+
+	// if User.Password != LoginRequest.Password {
+	// 	c.JSON(http.StatusUnauthorized, gin.H{
+	// 		"status":  false,
+	// 		"message": "Incorrect password",
+	// 	})
+	// 	return
+	// }
+	if User.Blocked {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  false,
+			"message": "user is not authorized to access",
 		})
 		return
 	}
@@ -239,4 +265,80 @@ func VarifyEmail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Email verified"})
+}
+
+func HashPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedPassword), nil
+}
+
+func CheckPassword(hashedPassword, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+func GenerateOTP() (uint64, time.Time) {
+	otp := uint64(rand.Intn(900000) + 100000)
+	otpExpiry := time.Now().Add(3 * time.Minute)
+	return otp, otpExpiry
+}
+
+func ResendOTP(c *gin.Context) {
+
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "email is required",
+		})
+		return
+	}
+
+	otp, otpExpiry := GenerateOTP()
+
+	var user models.User
+	tx := database.DB.Where("email = ? AND deleted_at IS NULL", email).First(&user)
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":  false,
+				"message": "user not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  false,
+				"message": "error retrieving user from the database",
+			})
+		}
+		return
+	}
+
+	user.OTP = otp
+	user.OTPExpiry = otpExpiry
+
+	tx = database.DB.Save(&user)
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to update OTP in the database",
+		})
+		return
+	}
+
+	err := sendOTPEmail(user.Email, otp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to send OTP email: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "OTP has been resent successfully",
+	})
+
 }

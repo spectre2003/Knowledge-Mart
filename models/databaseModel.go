@@ -41,9 +41,12 @@ type Seller struct {
 }
 
 type Category struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name        string `gorm:"type:varchar(255)" validate:"required" json:"name"`
-	Description string `gorm:"type:varchar(255)" validate:"required" json:"description"`
+	gorm.Model
+	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name        string    `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	Description string    `gorm:"type:varchar(255)" validate:"required" json:"description"`
+	Image       string    `gorm:"type:varchar(255)" validate:"required" json:"image"`
+	Products    []Product `gorm:"foreignKey:CategoryID"`
 }
 
 type Product struct {
@@ -59,15 +62,3 @@ type Product struct {
 	Price        float64        `gorm:"type:decimal(10,2);not null" validate:"required" json:"price"`
 	Image        pq.StringArray `gorm:"type:varchar(255)[]" validate:"required" json:"image_url"`
 }
-
-// type Product struct {
-// 	gorm.Model
-// 	ID           uint           `gorm:"primaryKey;autoIncrement" json:"id"`
-// 	SellerID     Seller         `gorm:"foreignKey:SellerID not null;constraint:OnDelete:CASCADE;" json:"sellerId"`
-// 	Name         string         `gorm:"type:varchar(255)" validate:"required" json:"name"`
-// 	CategoryID   Category       `gorm:"foreignKey:CategoryID not null;constraint:OnDelete:CASCADE;" json:"categoryId"`
-// 	Description  string         `gorm:"type:varchar(255)" validate:"required" json:"description"`
-// 	Availability bool           `gorm:"type:bool;default:true" json:"availability"`
-// 	Price        float64        `gorm:"type:decimal(10,2);not null" validate:"required" json:"price"`
-// 	Image        pq.StringArray `gorm:"type:varchar(255)[]" validate:"required" json:"image_url"`
-// }

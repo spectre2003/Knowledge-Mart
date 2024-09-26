@@ -1,6 +1,8 @@
 package models
 
-import "github.com/lib/pq"
+import (
+	"github.com/lib/pq"
+)
 
 type EmailSignupRequest struct {
 	Name            string `validate:"required" json:"name"`
@@ -46,10 +48,12 @@ type EditProductRequest struct {
 type AddCategoryRequest struct {
 	Name        string `validate:"required" json:"name"`
 	Description string `validate:"required" json:"description"`
+	Image       string `validate:"required" json:"image"`
 }
 
 type EditCategoryRequest struct {
 	ID          uint   `validate:"required,number" json:"id"`
 	Name        string `validate:"required" json:"name"`
 	Description string `validate:"required" json:"description"`
+	Image       string `validate:"required" json:"image"`
 }

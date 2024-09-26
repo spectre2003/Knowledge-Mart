@@ -56,6 +56,4 @@ func AdminLogin(c *gin.Context) {
 		"token":   token,
 		"message": "login success",
 	})
-	//c.JSON(http.StatusSeeOther, gin.H{"redirect": "/admin-panel"})
-
 }
