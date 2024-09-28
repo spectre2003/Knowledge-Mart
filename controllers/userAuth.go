@@ -33,8 +33,8 @@ var Validate *validator.Validate
 
 var googleOauthConfig = &oauth2.Config{
 	RedirectURL:  "http://localhost:8080/api/v1/googlecallback",
-	ClientID:     "968239798320-56jar3nqlvortunvtkfckovpgb9lnl30.apps.googleusercontent.com", // os.Getenv("CLIENTID"),
-	ClientSecret: "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",                                      //os.Getenv("CLIENTSECRET"),
+	ClientID:     os.Getenv("CLIENTID"),
+	ClientSecret: os.Getenv("CLIENTSECRET"),
 	Scopes: []string{"https://www.googleapis.com/auth/userinfo.email",
 		"https://www.googleapis.com/auth/userinfo.profile"},
 	Endpoint: google.Endpoint,
