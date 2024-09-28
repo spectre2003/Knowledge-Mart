@@ -23,7 +23,7 @@ type User struct {
 	Picture     string `gorm:"type:text" json:"picture"`
 	Password    string `gorm:"type:varchar(255)" validate:"required" json:"password"`
 	Blocked     bool   `gorm:"type:bool" json:"blocked"`
-	Address     string `gorm:"type:varchar(255)" json:"address"`
+	//Address     string `gorm:"type:varchar(255)" json:"address"`
 	OTP         uint64
 	OTPExpiry   time.Time
 	IsVerified  bool   `gorm:"type:bool" json:"verified"`
@@ -62,4 +62,15 @@ type Product struct {
 	Availability bool           `gorm:"type:bool;default:true" json:"availability"`
 	Price        float64        `gorm:"type:decimal(10,2);not null" validate:"required" json:"price"`
 	Image        pq.StringArray `gorm:"type:varchar(255)[]" validate:"required" json:"image_url"`
+}
+
+type Address struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID       uint   `gorm:"not null;constraint:OnDelete:CASCADE;" json:"userId"`
+	User         User   `gorm:"foreignKey:UserID"`
+	StreetName   string `gorm:"type:varchar(255)" validate:"required" json:"street_name"`
+	StreetNumber string `gorm:"type:varchar(255)" validate:"required" json:"street_number"`
+	City         string `gorm:"type:varchar(255)" validate:"required" json:"city"`
+	State        string `gorm:"type:varchar(255)" validate:"required" json:"state"`
+	PinCode      string `gorm:"type:varchar(255)" validate:"required" json:"pincode"`
 }

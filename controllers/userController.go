@@ -49,9 +49,9 @@ func ListAllUsers(c *gin.Context) {
 			Email:       user.Email,
 			PhoneNumber: user.PhoneNumber,
 			Picture:     user.Picture,
-			Address:     user.Address,
-			Blocked:     user.Blocked,
-			IsVerified:  user.IsVerified,
+			//Address:     user.Address,
+			Blocked:    user.Blocked,
+			IsVerified: user.IsVerified,
 		})
 	}
 
@@ -230,9 +230,9 @@ func ListBlockedUsers(c *gin.Context) {
 			Email:       user.Email,
 			PhoneNumber: user.PhoneNumber,
 			Picture:     user.Picture,
-			Address:     user.Address,
-			Blocked:     user.Blocked,
-			IsVerified:  user.IsVerified,
+			//Address:     user.Address,
+			Blocked:    user.Blocked,
+			IsVerified: user.IsVerified,
 		})
 	}
 

@@ -254,12 +254,11 @@ func EmailSignup(c *gin.Context) {
 			"email":        User.Email,
 			"phone_number": User.PhoneNumber,
 			"picture":      User.Picture,
-			"address":      User.Address,
+			//"address":      User.Address,
 			"block_status": User.Blocked,
 			"verified":     User.IsVerified,
 		},
 	})
-	//c.Next()
 }
 func EmailLogin(c *gin.Context) {
 	var LoginRequest models.EmailLoginRequest
@@ -337,7 +336,7 @@ func EmailLogin(c *gin.Context) {
 			"email":        User.Email,
 			"phone_number": User.PhoneNumber,
 			"picture":      User.Picture,
-			"address":      User.Address,
+			//"address":      User.Address,
 			"block_status": User.Blocked,
 			"verified":     User.IsVerified,
 		},

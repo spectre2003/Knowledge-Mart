@@ -17,7 +17,6 @@ type UserResponse struct {
 	Email       string `json:"email"`
 	PhoneNumber string `json:"phone_number"`
 	Picture     string `json:"picture"`
-	Address     string `json:"address"`
 	Blocked     bool   `json:"blocked"`
 	IsVerified  bool   `json:"verified"`
 }
@@ -46,4 +45,22 @@ type GoogleResponse struct {
 	FamilyName    string `json:"family_name"`
 	Picture       string `json:"picture"`
 	Locale        string `json:"locale"`
+}
+
+type AddressResponse struct {
+	ID           uint   `json:"id"`
+	Username     string `json:"name"`
+	StreetName   string `json:"streetname"`
+	StreetNumber string `json:"streetNumber"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	PinCode      string `json:"pincode"`
+	Phone        string `json:"phoneNumber"`
+}
+
+type UserProfileResponse struct {
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phone_number"`
+	Picture     string `json:"picture"`
 }

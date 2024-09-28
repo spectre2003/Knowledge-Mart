@@ -210,6 +210,7 @@ func DeleteProduct(c *gin.Context) {
 		return
 	}
 	var product models.Product
+
 	if err := database.DB.First(&product, productID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  false,
@@ -217,6 +218,7 @@ func DeleteProduct(c *gin.Context) {
 		})
 		return
 	}
+
 	if err := database.DB.Delete(&product, productID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  false,
@@ -224,6 +226,7 @@ func DeleteProduct(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
 		"message": "successfully deleted the product",

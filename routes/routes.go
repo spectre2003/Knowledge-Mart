@@ -35,6 +35,12 @@ func RegisterRoutes(router *gin.Engine) {
 	userRoutes.Use(middleware.AuthRequired)
 	{
 		userRoutes.POST("/seller_registration", controllers.SellerRegister)
+		userRoutes.POST("/add_address", controllers.AddAddress)
+		userRoutes.GET("/get_address", controllers.ListAllAddress)
+		userRoutes.PUT("/edit_address", controllers.EditAddress)
+		userRoutes.DELETE("/delete_address", controllers.DeleteAddress)
+		userRoutes.GET("/user_profile", controllers.GetUserProfile)
+		userRoutes.PUT("/edit_user_profile", controllers.EditUserProfile)
 	}
 
 	sellerRoutes := router.Group("/seller")
