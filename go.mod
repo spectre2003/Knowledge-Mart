@@ -5,6 +5,7 @@ go 1.22.6
 require gorm.io/gorm v1.25.12
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
@@ -46,6 +47,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/joho/godotenv v1.5.1
+	golang.org/x/oauth2 v0.23.0
 	golang.org/x/text v0.15.0 // indirect
 	gorm.io/driver/postgres v1.5.9
 )

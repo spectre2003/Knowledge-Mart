@@ -1,8 +1,12 @@
 package controllers
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -20,10 +24,145 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
 )
 
 var Validate *validator.Validate
+
+var googleOauthConfig = &oauth2.Config{
+	RedirectURL:  "http://localhost:8080/api/v1/googlecallback",
+	ClientID:     "968239798320-56jar3nqlvortunvtkfckovpgb9lnl30.apps.googleusercontent.com", // os.Getenv("CLIENTID"),
+	ClientSecret: "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",                                      //os.Getenv("CLIENTSECRET"),
+	Scopes: []string{"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile"},
+	Endpoint: google.Endpoint,
+}
+
+func GoogleHandleLogin(c *gin.Context) {
+	state := "hjdfyuhadVFYU6781235"
+	url := googleOauthConfig.AuthCodeURL(state)
+	c.Redirect(http.StatusTemporaryRedirect, url)
+	c.Next()
+}
+
+func GoogleHandleCallback(c *gin.Context) {
+	fmt.Println("Starting to handle callback")
+	fmt.Printf("Callback URL Params: %v\n", c.Request.URL.Query())
+
+	//code := c.Query("code")
+	code := strings.TrimSpace(c.Query("code"))
+
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "missing code parameter",
+		})
+		return
+	}
+	// Exchange code for token
+	token, err := googleOauthConfig.Exchange(context.Background(), code)
+	if err != nil {
+		log.Printf("Token Exchange Error: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "failed to exchange token",
+		})
+		return
+	}
+
+	// Use access token to get user info
+	response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to get user information",
+		})
+		return
+	}
+	defer response.Body.Close()
+
+	// Read response body
+	content, err := io.ReadAll(response.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to read user information",
+		})
+		return
+	}
+
+	// Parse the Google user information
+	var googleUser models.GoogleResponse
+	err = json.Unmarshal(content, &googleUser)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to parse user information",
+		})
+		return
+	}
+
+	// Check if the user already exists in the database
+	var existingUser models.User
+	if err := database.DB.Where("email = ?", googleUser.Email).First(&existingUser).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create a new user if not found
+			newUser := models.User{
+				Email:       googleUser.Email,
+				Name:        googleUser.Name,
+				Picture:     googleUser.Picture,
+				LoginMethod: "google",
+				IsVerified:  true,
+			}
+			if err := database.DB.Create(&newUser).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"status":  false,
+					"message": "failed to create new user",
+				})
+				return
+			}
+			existingUser = newUser // Assign the newly created user to existingUser for later token generation
+		} else {
+			// Some other error occurred
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  false,
+				"message": "failed to fetch user from database",
+			})
+			return
+		}
+	}
+
+	// Check if the user is blocked or needs to login with another method
+	if existingUser.Blocked {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  false,
+			"message": "user is unauthorized to access",
+		})
+		return
+	}
+
+	// Generate JWT using userID
+	tokenstring, err := utils.GenerateJWT(existingUser.ID, "user")
+	if tokenstring == "" || err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  false,
+			"message": "failed to create authorization token",
+		})
+		return
+	}
+
+	// Return success response with JWT and user info
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "login successful",
+		"data": gin.H{
+			"token": tokenstring,
+			"user":  existingUser,
+		},
+	})
+}
 
 func EmailSignup(c *gin.Context) {
 
@@ -74,6 +213,7 @@ func EmailSignup(c *gin.Context) {
 		OTP:         otp,
 		OTPExpiry:   otpExpiry,
 		IsVerified:  false,
+		LoginMethod: "email",
 	}
 
 	tx := database.DB.Where("email = ? AND deleted_at IS NULL", Signup.Email).First(&User)

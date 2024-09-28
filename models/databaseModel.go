@@ -26,7 +26,8 @@ type User struct {
 	Address     string `gorm:"type:varchar(255)" json:"address"`
 	OTP         uint64
 	OTPExpiry   time.Time
-	IsVerified  bool `gorm:"type:bool" json:"verified"`
+	IsVerified  bool   `gorm:"type:bool" json:"verified"`
+	LoginMethod string `gorm:"type:varchar(50)" json:"login_method"`
 }
 
 type Seller struct {

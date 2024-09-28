@@ -42,7 +42,7 @@ type EditProductRequest struct {
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
 	Image        pq.StringArray `json:"image_url"`
-	Availability bool           `json:"verified"`
+	Availability bool           `json:"availability"`
 }
 
 type AddCategoryRequest struct {

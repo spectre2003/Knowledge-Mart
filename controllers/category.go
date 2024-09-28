@@ -42,10 +42,47 @@ func ListAllCategory(c *gin.Context) {
 	})
 }
 
-// func ListCategoryProductList (c *gin.Context){
-// 	var  categories []models.Category
+func ListCategoryProductList(c *gin.Context) {
+	catid := c.Query("id")
+	if catid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  false,
+			"message": "missing category id",
+		})
+		return
+	}
 
-// }
+	var products []models.Product
+	tx := database.DB.Select("*").Where("category_id = ?", catid).Find(&products)
+
+	if tx.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  false,
+			"message": "failed to retrieve products for the specified category",
+		})
+		return
+	}
+
+	var productResponse []models.ProductResponse // Define this struct if not already defined
+
+	for _, product := range products {
+		productResponse = append(productResponse, models.ProductResponse{
+			ID:          product.ID,
+			Name:        product.Name,
+			Description: product.Description,
+			Image:       product.Image,
+			// Add more fields as needed
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "successfully retrieved products for category",
+		"data": gin.H{
+			"products": productResponse,
+		},
+	})
+}
 
 func AddCatogory(c *gin.Context) {
 	var Request models.AddCategoryRequest

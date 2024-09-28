@@ -19,6 +19,9 @@ func RegisterRoutes(router *gin.Engine) {
 	router.POST("/user_signup", controllers.EmailSignup)
 	router.POST("/user_login", controllers.EmailLogin)
 
+	router.GET("/api/v1/googlelogin", controllers.GoogleHandleLogin)
+	router.GET("/api/v1/googlecallback", controllers.GoogleHandleCallback)
+
 	router.GET("/verifyemail/:email/:otp", controllers.VarifyEmail)
 	router.POST("/resend_otp/:email", controllers.ResendOTP)
 
@@ -26,6 +29,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 	router.GET("/All_Products", controllers.ListAllProduct)
 	router.GET("/all_category", controllers.ListAllCategory)
+	router.GET("/product_category", controllers.ListCategoryProductList)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.AuthRequired)

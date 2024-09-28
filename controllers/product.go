@@ -148,13 +148,15 @@ func EditProduct(c *gin.Context) {
 		return
 	}
 
+	// Update the product fields
 	existingProduct.Name = Request.Name
 	existingProduct.Description = Request.Description
 	existingProduct.Price = Request.Price
 	existingProduct.Image = Request.Image
 	existingProduct.Availability = Request.Availability
 
-	if err := database.DB.Where("id = ?", Request.ProductID).Updates(&existingProduct).Error; err != nil {
+	// Use Select to update all fields including Availability
+	if err := database.DB.Model(&existingProduct).Select("Name", "Description", "Price", "Image", "Availability").Updates(&existingProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  false,
 			"message": "failed to update product",
@@ -169,7 +171,6 @@ func EditProduct(c *gin.Context) {
 			"product": Request,
 		},
 	})
-
 }
 
 func DeleteProduct(c *gin.Context) {
