@@ -14,20 +14,29 @@ func AuthRequired(c *gin.Context) {
 	fmt.Println("Authorization Header:", authHeader)
 
 	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Authorization header required"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "Authorization header required",
+		})
 		c.Abort()
 		return
 	}
 	tokenString := strings.TrimSpace(strings.Replace(authHeader, "Bearer", "", 1))
 	if tokenString == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token format"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "Invalid token format",
+		})
 		c.Abort()
 		return
 	}
 
 	claims, err := utils.ValidateJWT(tokenString)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": fmt.Sprintf("Token validation failed: %v", err)})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": fmt.Sprintf("Token validation failed: %v", err),
+		})
 		c.Abort()
 		return
 	}
@@ -42,7 +51,9 @@ func AuthRequired(c *gin.Context) {
 	case "admin":
 		c.Set("adminID", claims.ID)
 	default:
-		c.JSON(http.StatusForbidden, gin.H{"message": "Unauthorized role"})
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  "failed",
+			"message": "Unauthorized role"})
 		c.Abort()
 		return
 	}

@@ -17,7 +17,7 @@ func ListAllCategory(c *gin.Context) {
 
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve data from the database, or the product doesn't exist",
 		})
 		return
@@ -34,7 +34,7 @@ func ListAllCategory(c *gin.Context) {
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully retrieved products",
 		"data": gin.H{
 			"categories": categoryResponse,
@@ -46,7 +46,7 @@ func ListCategoryProductList(c *gin.Context) {
 	catid := c.Query("id")
 	if catid == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "missing category id",
 		})
 		return
@@ -57,7 +57,7 @@ func ListCategoryProductList(c *gin.Context) {
 
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve products for the specified category",
 		})
 		return
@@ -76,7 +76,7 @@ func ListCategoryProductList(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully retrieved products for category",
 		"data": gin.H{
 			"products": productResponse,
@@ -90,7 +90,7 @@ func AddCatogory(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized ",
 		})
 		return
@@ -99,7 +99,7 @@ func AddCatogory(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -107,7 +107,7 @@ func AddCatogory(c *gin.Context) {
 
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to process incoming request",
 		})
 		return
@@ -116,7 +116,7 @@ func AddCatogory(c *gin.Context) {
 	validate := validator.New()
 	if err := validate.Struct(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
@@ -126,7 +126,7 @@ func AddCatogory(c *gin.Context) {
 
 	if wordCount < 10 {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "description must be a minimum of 10 words",
 		})
 		return
@@ -136,7 +136,7 @@ func AddCatogory(c *gin.Context) {
 
 	if err := database.DB.Where("name = ?", Request.Name).First(&existCategory).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "category already exists",
 		})
 		return
@@ -150,7 +150,7 @@ func AddCatogory(c *gin.Context) {
 
 	if err := database.DB.Save(&NewCategory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "unable to add new category, server error ",
 		})
 		return
@@ -158,7 +158,7 @@ func AddCatogory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successully added a new category",
 		"data": gin.H{
 			"category": Request,
@@ -174,7 +174,7 @@ func EditCategory(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized ",
 		})
 		return
@@ -183,14 +183,14 @@ func EditCategory(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
 	}
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to process incoming request",
 		})
 		return
@@ -198,7 +198,7 @@ func EditCategory(c *gin.Context) {
 
 	if err := database.DB.First(&existCategory, Request.ID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "category not found",
 		})
 		return
@@ -212,7 +212,7 @@ func EditCategory(c *gin.Context) {
 
 	if err := database.DB.Save(&existCategory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to update category details",
 		})
 		return
@@ -220,7 +220,7 @@ func EditCategory(c *gin.Context) {
 
 	// Success response
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully updated category",
 	})
 }
@@ -230,7 +230,7 @@ func DeleteCategory(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized",
 		})
 		return
@@ -239,7 +239,7 @@ func DeleteCategory(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -249,7 +249,7 @@ func DeleteCategory(c *gin.Context) {
 	categoryIDStr := c.Query("categoryid")
 	if categoryIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "categoryid is required",
 		})
 		return
@@ -259,7 +259,7 @@ func DeleteCategory(c *gin.Context) {
 	// Fetch the category using the categoryID
 	if err := database.DB.First(&category, categoryIDStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to fetch category from the database",
 		})
 		return
@@ -271,7 +271,7 @@ func DeleteCategory(c *gin.Context) {
 
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to check products for this category",
 		})
 		return
@@ -279,7 +279,7 @@ func DeleteCategory(c *gin.Context) {
 
 	if productCount > 0 {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "category contains products, change the category of these products before using this endpoint",
 		})
 		return
@@ -288,14 +288,14 @@ func DeleteCategory(c *gin.Context) {
 	// Delete the category from the database
 	if err := database.DB.Delete(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to delete category from the database",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully deleted category from the database",
 	})
 }

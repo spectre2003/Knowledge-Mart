@@ -24,6 +24,7 @@ type SellerRegisterRequest struct {
 }
 
 type SellerLoginRequest struct {
+	UserID   uint   `json:"userid"`
 	UserName string `form:"" username:"required" json:"username"`
 	Password string `form:"password" validate:"required" json:"password"`
 }

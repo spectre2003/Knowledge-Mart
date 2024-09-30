@@ -13,7 +13,7 @@ func ListAllUsers(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized",
 		})
 		return
@@ -22,7 +22,7 @@ func ListAllUsers(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -35,7 +35,7 @@ func ListAllUsers(c *gin.Context) {
 	tx := database.DB.Find(&users)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve data from the database, or the data doesn't exist",
 		})
 		return
@@ -56,7 +56,7 @@ func ListAllUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully retrieved user information",
 		"data": gin.H{
 			"users": userResponse,
@@ -68,7 +68,7 @@ func BlockUser(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized",
 		})
 		return
@@ -77,7 +77,7 @@ func BlockUser(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -87,7 +87,7 @@ func BlockUser(c *gin.Context) {
 
 	if userId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "userid is required",
 		})
 		return
@@ -97,7 +97,7 @@ func BlockUser(c *gin.Context) {
 
 	if err := database.DB.First(&user, userId).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to fetch user from the database",
 		})
 		return
@@ -105,7 +105,7 @@ func BlockUser(c *gin.Context) {
 
 	if user.Blocked {
 		c.JSON(http.StatusAlreadyReported, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "user is already blocked",
 		})
 		return
@@ -116,13 +116,13 @@ func BlockUser(c *gin.Context) {
 	tx := database.DB.Model(&user).Update("blocked", user.Blocked)
 	if tx.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to change the block status ",
 		})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"status":  false,
+		"status":  "failed",
 		"message": "successfully blocked the user",
 	})
 
@@ -132,7 +132,7 @@ func UnBlockUser(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized",
 		})
 		return
@@ -141,7 +141,7 @@ func UnBlockUser(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -151,7 +151,7 @@ func UnBlockUser(c *gin.Context) {
 
 	if userId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "userid is required",
 		})
 		return
@@ -161,7 +161,7 @@ func UnBlockUser(c *gin.Context) {
 
 	if err := database.DB.First(&user, userId).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to fetch user from the database",
 		})
 		return
@@ -169,7 +169,7 @@ func UnBlockUser(c *gin.Context) {
 
 	if !user.Blocked {
 		c.JSON(http.StatusAlreadyReported, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "user is already unblocked",
 		})
 		return
@@ -180,13 +180,13 @@ func UnBlockUser(c *gin.Context) {
 	tx := database.DB.Model(&user).Update("blocked", user.Blocked)
 	if tx.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to change the block status ",
 		})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"status":  false,
+		"status":  "failed",
 		"message": "successfully unblocked the user",
 	})
 
@@ -196,7 +196,7 @@ func ListBlockedUsers(c *gin.Context) {
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "not authorized",
 		})
 		return
@@ -205,7 +205,7 @@ func ListBlockedUsers(c *gin.Context) {
 	_, ok := adminID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve admin information",
 		})
 		return
@@ -217,7 +217,7 @@ func ListBlockedUsers(c *gin.Context) {
 	tx := database.DB.Where("deleted_at IS NULL AND blocked = ?", true).Find(&users)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve blocked user data from the database, or the data doesn't exists",
 		})
 		return
@@ -238,7 +238,7 @@ func ListBlockedUsers(c *gin.Context) {
 
 	if len(blockedUser) == 0 {
 		c.JSON(http.StatusOK, gin.H{
-			"status":  true,
+			"status":  "success",
 			"message": "no blocked users found",
 			"data":    blockedUser,
 		})
@@ -246,7 +246,7 @@ func ListBlockedUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully retrieved blocked user's data",
 		"data": gin.H{
 			"blocked_users": blockedUser,

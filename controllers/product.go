@@ -15,7 +15,7 @@ func AddProduct(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "seller not authorized",
 		})
 		return
@@ -24,7 +24,7 @@ func AddProduct(c *gin.Context) {
 	sellerIDUint, ok := sellerID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve seller information",
 		})
 		return
@@ -32,9 +32,10 @@ func AddProduct(c *gin.Context) {
 
 	// Parse the request body
 	var request models.AddProductRequest
+
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to process request",
 		})
 		return
@@ -44,7 +45,7 @@ func AddProduct(c *gin.Context) {
 	validate := validator.New()
 	if err := validate.Struct(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
@@ -52,9 +53,10 @@ func AddProduct(c *gin.Context) {
 
 	// Check if product with the same name already exists for this seller
 	var existingProduct models.Product
+
 	if err := database.DB.Where("name = ? AND seller_id = ? AND deleted_at IS NULL", request.Name, sellerIDUint).First(&existingProduct).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "product with the same name already exists for this seller",
 		})
 		return
@@ -74,7 +76,7 @@ func AddProduct(c *gin.Context) {
 	// Save the new product in the database
 	if err := database.DB.Create(&newProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to create product" + err.Error(),
 		})
 		return
@@ -82,11 +84,17 @@ func AddProduct(c *gin.Context) {
 
 	// Respond with success
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully added new product",
 		"data": gin.H{
-			"id":      newProduct.ID,
-			"product": newProduct,
+			"id":           newProduct.ID,
+			"product_name": newProduct.Name,
+			"category_id":  newProduct.CategoryID,
+			"seller_id":    newProduct.SellerID,
+			"describtion":  newProduct.Description,
+			"price":        newProduct.Price,
+			"image":        newProduct.Image,
+			"availability": newProduct.Availability,
 		},
 	})
 }
@@ -95,7 +103,7 @@ func EditProduct(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "seller not authorized",
 		})
 		return
@@ -104,7 +112,7 @@ func EditProduct(c *gin.Context) {
 	_, ok := sellerID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve seller information",
 		})
 		return
@@ -114,7 +122,7 @@ func EditProduct(c *gin.Context) {
 
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to process request",
 		})
 		return
@@ -122,7 +130,7 @@ func EditProduct(c *gin.Context) {
 	validate := validator.New()
 	if err := validate.Struct(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
@@ -132,7 +140,7 @@ func EditProduct(c *gin.Context) {
 
 	if sellerID != SellId {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "unauthorized request, product is not yours",
 		})
 		return
@@ -142,7 +150,7 @@ func EditProduct(c *gin.Context) {
 
 	if err := database.DB.Where("id = ?", Request.ProductID).First(&existingProduct).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to fetch product from the database",
 		})
 		return
@@ -158,14 +166,14 @@ func EditProduct(c *gin.Context) {
 	// Use Select to update all fields including Availability
 	if err := database.DB.Model(&existingProduct).Select("Name", "Description", "Price", "Image", "Availability").Updates(&existingProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to update product",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully updated product information",
 		"data": gin.H{
 			"product": Request,
@@ -177,7 +185,7 @@ func DeleteProduct(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "seller not authorized",
 		})
 		return
@@ -186,7 +194,7 @@ func DeleteProduct(c *gin.Context) {
 	_, ok := sellerID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve seller information",
 		})
 		return
@@ -195,7 +203,7 @@ func DeleteProduct(c *gin.Context) {
 	productID, err := strconv.Atoi(productIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "invalid product ID",
 		})
 		return
@@ -204,7 +212,7 @@ func DeleteProduct(c *gin.Context) {
 
 	if sellerID != SellId {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "unauthorized request, product is not yours",
 		})
 		return
@@ -213,7 +221,7 @@ func DeleteProduct(c *gin.Context) {
 
 	if err := database.DB.First(&product, productID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "product is not present in the database",
 		})
 		return
@@ -221,14 +229,14 @@ func DeleteProduct(c *gin.Context) {
 
 	if err := database.DB.Delete(&product, productID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "unable to delete the product from the database",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully deleted the product",
 	})
 }
@@ -247,7 +255,7 @@ func ListAllProduct(c *gin.Context) {
 	tx := database.DB.Select("*").Find(&Products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve data from the database, or the product doesn't exist",
 		})
 		return
@@ -266,7 +274,7 @@ func ListAllProduct(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "successfully retrieved products",
 		"data": gin.H{
 			"products": productResponse,

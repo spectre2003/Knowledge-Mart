@@ -1,14 +1,14 @@
 package controllers
 
 import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"gorm.io/gorm"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"knowledgeMart/utils"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
-	"gorm.io/gorm"
 )
 
 func SellerRegister(c *gin.Context) {
@@ -20,16 +20,18 @@ func SellerRegister(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "user not authorized ",
 		})
 		return
 	}
 
-	_, ok := userID.(uint)
+	fmt.Println("Extracted userID: ", userID)
+
+	userIDStr, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve user information",
 		})
 		return
@@ -38,7 +40,7 @@ func SellerRegister(c *gin.Context) {
 	// Bind JSON input to the SellerRegisterRequest struct
 	if err := c.ShouldBindJSON(&Register); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to process the incoming request: " + err.Error(),
 		})
 		return
@@ -48,23 +50,23 @@ func SellerRegister(c *gin.Context) {
 	err := Validate.Struct(Register)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
 	}
 
 	// Check if the user exists
-	if err := database.DB.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", userIDStr).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status":  false,
+				"status":  "failed",
 				"message": "user not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve user information",
 		})
 		return
@@ -72,16 +74,16 @@ func SellerRegister(c *gin.Context) {
 
 	// Check if the seller already exists for the user
 	var seller models.Seller
-	tx := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&seller)
+	tx := database.DB.Where("user_id = ? AND deleted_at IS NULL", userIDStr).First(&seller)
 	if tx.Error == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "seller already exists for this user",
 		})
 		return
 	} else if tx.Error != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to retrieve seller information",
 		})
 		return
@@ -89,7 +91,7 @@ func SellerRegister(c *gin.Context) {
 	hashpassword, err := HashPassword(Register.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "error in password hashing" + err.Error(),
 		})
 		return
@@ -104,28 +106,26 @@ func SellerRegister(c *gin.Context) {
 		IsVerified:  false,
 	}
 
-	// Save the new seller
 	if err := database.DB.Create(&newSeller).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to create a new seller",
-		})
-		return
-	}
-	token, err := utils.GenerateJWT(seller.ID, "seller")
-	if token == "" || err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
-			"message": "failed to generate token",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "Seller registered successfully ,status is pending , please login to continue",
-		"token":   token,
-		"data":    newSeller,
+		"data": gin.H{
+			"seller_name":     user.Name,
+			"seller_username": newSeller.UserName,
+			"description":     newSeller.Description,
+			"eamil":           user.Email,
+			"phone_number":    user.PhoneNumber,
+			"user_id":         newSeller.UserID,
+			"sellerId":        newSeller.ID,
+		},
 	})
 }
 
@@ -134,7 +134,7 @@ func SellerLogin(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&LoginSeller); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
@@ -144,7 +144,7 @@ func SellerLogin(c *gin.Context) {
 	err := Validate.Struct(LoginSeller)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": err.Error(),
 		})
 		return
@@ -154,7 +154,7 @@ func SellerLogin(c *gin.Context) {
 	tx := database.DB.Where("user_name = ? AND deleted_at is NULL", LoginSeller.UserName).First(&seller)
 	if tx.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "invalid email or password",
 		})
 		return
@@ -163,21 +163,14 @@ func SellerLogin(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "Incorrect password",
 		})
 		return
 	}
-	// if seller.Password != LoginSeller.Password {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{
-	// 		"status":  false,
-	// 		"message": "Incorrect password",
-	// 	})
-	// 	return
-	// }
 	if !seller.IsVerified {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "seller is not verified , status is pending ",
 		})
 		return
@@ -186,14 +179,14 @@ func SellerLogin(c *gin.Context) {
 	token, err := utils.GenerateJWT(seller.ID, "seller")
 	if token == "" || err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to generate token",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  true,
+		"status":  "success",
 		"message": "Seller Login successfully",
 		"data": gin.H{
 			"token":    token,

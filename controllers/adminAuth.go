@@ -18,7 +18,8 @@ func AdminLogin(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request format",
+			"status": "failed",
+			"error":  "invalid request format",
 		})
 		return
 	}
@@ -27,26 +28,29 @@ func AdminLogin(c *gin.Context) {
 	if tx := database.DB.Where("email = ?", loginData.Email).First(&admin); tx.Error != nil {
 		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Email not present in the admin table",
+				"status": "failed",
+				"error":  "Email not present in the admin table",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database error",
+			"status": "failed",
+			"error":  "Database error",
 		})
 		return
 	}
 
 	if admin.Password != loginData.Password {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "invalid email or password",
+			"status": "failed",
+			"error":  "invalid email or password",
 		})
 		return
 	}
 	token, err := utils.GenerateJWT(admin.ID, "admin")
 	if token == "" || err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
+			"status":  "failed",
 			"message": "failed to generate token",
 		})
 		return
@@ -54,6 +58,7 @@ func AdminLogin(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":   token,
+		"status":  "success",
 		"message": "login success",
 	})
 }
