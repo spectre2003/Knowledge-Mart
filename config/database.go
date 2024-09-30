@@ -27,5 +27,7 @@ func ConnectDB() {
 		&models.Product{},
 		&models.Category{},
 		&models.Address{},
+		&models.UserCart{},
+		&models.CartItems{},
 	)
 }

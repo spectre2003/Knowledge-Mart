@@ -63,15 +63,17 @@ func ListCategoryProductList(c *gin.Context) {
 		return
 	}
 
-	var productResponse []models.ProductResponse // Define this struct if not already defined
+	var productResponse []models.ProductResponse
 
 	for _, product := range products {
 		productResponse = append(productResponse, models.ProductResponse{
-			ID:          product.ID,
-			Name:        product.Name,
-			Description: product.Description,
-			Image:       product.Image,
-			// Add more fields as needed
+			ID:           product.ID,
+			Name:         product.Name,
+			Price:        product.Price,
+			Description:  product.Description,
+			Image:        product.Image,
+			Availability: product.Availability,
+			SellerID:     product.SellerID,
 		})
 	}
 
@@ -161,7 +163,10 @@ func AddCatogory(c *gin.Context) {
 		"status":  "success",
 		"message": "successully added a new category",
 		"data": gin.H{
-			"category": Request,
+			"id":          NewCategory.ID,
+			"name":        NewCategory.Name,
+			"description": NewCategory.Description,
+			"image":       NewCategory.Image,
 		},
 	})
 
@@ -204,13 +209,17 @@ func EditCategory(c *gin.Context) {
 		return
 	}
 
-	if Request.Name != existCategory.Name {
+	if Request.Name != "" {
 		existCategory.Name = Request.Name
 	}
-	existCategory.Description = Request.Description
-	existCategory.Image = Request.Image
+	if Request.Description != "" {
+		existCategory.Description = Request.Description
+	}
+	if Request.Image != "" {
+		existCategory.Image = Request.Image
+	}
 
-	if err := database.DB.Save(&existCategory).Error; err != nil {
+	if err := database.DB.Model(&existCategory).Updates(existCategory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
 			"message": "failed to update category details",
@@ -222,6 +231,12 @@ func EditCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully updated category",
+		"data": gin.H{
+			"id":          existCategory.ID,
+			"name":        existCategory.Name,
+			"description": existCategory.Description,
+			"image":       existCategory.Image,
+		},
 	})
 }
 

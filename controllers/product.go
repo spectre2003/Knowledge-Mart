@@ -156,15 +156,29 @@ func EditProduct(c *gin.Context) {
 		return
 	}
 
-	// Update the product fields
-	existingProduct.Name = Request.Name
-	existingProduct.Description = Request.Description
-	existingProduct.Price = Request.Price
-	existingProduct.Image = Request.Image
-	existingProduct.Availability = Request.Availability
+	// Update only if each field in the request is non-empty or non-zero
+	if Request.Name != "" {
+		existingProduct.Name = Request.Name
+	}
+
+	if Request.Description != "" {
+		existingProduct.Description = Request.Description
+	}
+
+	if Request.Price != 0 {
+		existingProduct.Price = Request.Price
+	}
+
+	if len(Request.Image) > 0 {
+		existingProduct.Image = Request.Image
+	}
+
+	if Request.Availability != nil {
+		existingProduct.Availability = *Request.Availability
+	}
 
 	// Use Select to update all fields including Availability
-	if err := database.DB.Model(&existingProduct).Select("Name", "Description", "Price", "Image", "Availability").Updates(&existingProduct).Error; err != nil {
+	if err := database.DB.Model(&existingProduct).Updates(existingProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
 			"message": "failed to update product",
@@ -176,7 +190,12 @@ func EditProduct(c *gin.Context) {
 		"status":  "success",
 		"message": "successfully updated product information",
 		"data": gin.H{
-			"product": Request,
+			"id":           existingProduct.ID,
+			"name":         existingProduct.Name,
+			"description":  existingProduct.Description,
+			"price":        existingProduct.Price,
+			"image":        existingProduct.Image,
+			"availability": existingProduct.Availability,
 		},
 	})
 }
@@ -270,6 +289,7 @@ func ListAllProduct(c *gin.Context) {
 			Price:        product.Price,
 			Image:        product.Image,
 			Availability: product.Availability,
+			SellerID:     product.SellerID,
 		})
 	}
 

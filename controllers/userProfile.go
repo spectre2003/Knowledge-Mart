@@ -72,7 +72,7 @@ func EditUserProfile(c *gin.Context) {
 		return
 	}
 
-	_, ok := userID.(uint)
+	userIDUint, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -81,7 +81,7 @@ func EditUserProfile(c *gin.Context) {
 		return
 	}
 
-	var Request models.EditUserProfileResponse
+	var Request models.EditUserProfileRequest
 
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -101,7 +101,7 @@ func EditUserProfile(c *gin.Context) {
 
 	var existingUser models.User
 
-	if err := database.DB.Where("id = ?", Request.ID).First(&existingUser).Error; err != nil {
+	if err := database.DB.Where("id = ?", userIDUint).First(&existingUser).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": "failed to fetch user details from the database",
@@ -109,9 +109,11 @@ func EditUserProfile(c *gin.Context) {
 		return
 	}
 
-	existingUser.Name = Request.Name
+	if Request.Name != "" {
+		existingUser.Name = Request.Name
+	}
 
-	if existingUser.Email != Request.Email {
+	if existingUser.Email != Request.Email && Request.Email != "" {
 		otp, otpExpiry := GenerateOTP()
 		existingUser.OTP = otp
 		existingUser.OTPExpiry = otpExpiry
@@ -148,9 +150,11 @@ func EditUserProfile(c *gin.Context) {
 		return
 	}
 
-	existingUser.PhoneNumber = Request.PhoneNumber
+	if Request.PhoneNumber != "" {
+		existingUser.PhoneNumber = Request.PhoneNumber
+	}
 
-	if err := database.DB.Model(&existingUser).Select("name", "email", "phone_number").Updates(&existingUser).Error; err != nil {
+	if err := database.DB.Model(&existingUser).Select("name", "phone_number").Updates(&existingUser).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
 			"message": "failed to update user profile",
@@ -177,7 +181,7 @@ func AddAddress(c *gin.Context) {
 		return
 	}
 
-	_, ok := userID.(uint)
+	userIDUint, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -203,14 +207,6 @@ func AddAddress(c *gin.Context) {
 		return
 	}
 
-	userIDUint, ok := userID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve user information",
-		})
-		return
-	}
 	var user models.User
 	if err := database.DB.Where("id = ?", userIDUint).First(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -229,7 +225,6 @@ func AddAddress(c *gin.Context) {
 		return
 	}
 
-	//check if the user already has 3 address...3 is the limit
 	if len(UserAddresses) >= 3 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
@@ -302,11 +297,10 @@ func ListAllAddress(c *gin.Context) {
 	var Addresses []models.Address
 	var AddressResponse []models.AddressResponse
 
-	tx := database.DB.Select("*").Find(&Addresses)
-	if tx.Error != nil {
+	if err := database.DB.Where("user_id = ?", userIDUint).Find(&Addresses).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "failed to retrieve data from the database",
+			"message": "failed to retrieve addresses",
 		})
 		return
 	}
@@ -333,16 +327,17 @@ func ListAllAddress(c *gin.Context) {
 }
 
 func EditAddress(c *gin.Context) {
+	// Retrieve userID from context
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "user not authorized ",
+			"message": "user not authorized",
 		})
 		return
 	}
 
-	_, ok := userID.(uint)
+	userIDUint, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -351,17 +346,19 @@ func EditAddress(c *gin.Context) {
 		return
 	}
 
-	var Request models.EditAddresRequest
-
-	if err := c.BindJSON(&Request); err != nil {
+	// Bind request to EditAddressRequest struct
+	var request models.EditAddresRequest
+	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": "failed to process request",
 		})
 		return
 	}
+
+	// Validate request data
 	validate := validator.New()
-	if err := validate.Struct(&Request); err != nil {
+	if err := validate.Struct(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": err.Error(),
@@ -369,23 +366,35 @@ func EditAddress(c *gin.Context) {
 		return
 	}
 
+	// Fetch the existing address and ensure it belongs to the user
 	var existingAddress models.Address
-
-	if err := database.DB.Where("id = ?", Request.ID).First(&existingAddress).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+	if err := database.DB.Where("id = ? AND user_id = ?", request.ID, userIDUint).First(&existingAddress).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "failed to fetch address from the database",
+			"message": "address not found or doesn't belong to the user",
 		})
 		return
 	}
 
-	existingAddress.StreetName = Request.StreetName
-	existingAddress.StreetNumber = Request.StreetNumber
-	existingAddress.City = Request.City
-	existingAddress.State = Request.State
-	existingAddress.PinCode = Request.Pincode
+	// Update fields only if they are provided in the request (i.e., non-zero or non-empty values)
+	if request.StreetName != "" {
+		existingAddress.StreetName = request.StreetName
+	}
+	if request.StreetNumber != "" {
+		existingAddress.StreetNumber = request.StreetNumber
+	}
+	if request.City != "" {
+		existingAddress.City = request.City
+	}
+	if request.State != "" {
+		existingAddress.State = request.State
+	}
+	if request.Pincode != "" {
+		existingAddress.PinCode = request.Pincode
+	}
 
-	if err := database.DB.Model(&existingAddress).Select("street_name", "street_number", "city", "state", "pincode").Updates(&existingAddress).Error; err != nil {
+	// Update the address record in the database
+	if err := database.DB.Model(&existingAddress).Updates(existingAddress).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
 			"message": "failed to update address",
@@ -393,14 +402,19 @@ func EditAddress(c *gin.Context) {
 		return
 	}
 
+	// Return success response with updated address details
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully updated address information",
 		"data": gin.H{
-			"product": Request,
+			"id":           existingAddress.ID,
+			"streetname":   existingAddress.StreetName,
+			"streetnumber": existingAddress.StreetNumber,
+			"city":         existingAddress.City,
+			"state":        existingAddress.State,
+			"pincode":      existingAddress.PinCode,
 		},
 	})
-
 }
 
 func DeleteAddress(c *gin.Context) {
@@ -467,7 +481,7 @@ func EditPssword(c *gin.Context) {
 		return
 	}
 
-	_, ok := userID.(uint)
+	userIDStr, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -475,4 +489,74 @@ func EditPssword(c *gin.Context) {
 		})
 		return
 	}
+
+	var Request models.EditPasswordRequest
+
+	if err := c.BindJSON(&Request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "failed to process request",
+		})
+		return
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(&Request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	var existingUser models.User
+
+	if err := database.DB.Where("id = ?", userIDStr).First(&existingUser).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch user from the database",
+		})
+		return
+	}
+
+	err := CheckPassword(existingUser.Password, Request.CurrentPassword)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "Incorrect user password",
+		})
+		return
+	}
+
+	if Request.NewPassword != Request.ConfirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "passwords doesn't match",
+		})
+		return
+	}
+	hashpassword, err := HashPassword(Request.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "error in password hashing" + err.Error(),
+		})
+		return
+	}
+
+	existingUser.Password = hashpassword
+
+	if err := database.DB.Model(&existingUser).Select("password").Updates(&existingUser).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to update password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "successfully updated user password",
+	})
 }

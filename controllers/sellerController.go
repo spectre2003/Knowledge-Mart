@@ -10,6 +10,7 @@ import (
 
 func ListAllSellers(c *gin.Context) {
 
+	// Check if admin is authorized
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -31,7 +32,8 @@ func ListAllSellers(c *gin.Context) {
 	var sellerResponse []models.SellerResponse
 	var sellers []models.Seller
 
-	tx := database.DB.Find(&sellers)
+	// Preload the User data for each seller
+	tx := database.DB.Preload("User").Find(&sellers)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -43,17 +45,21 @@ func ListAllSellers(c *gin.Context) {
 	for _, seller := range sellers {
 		sellerResponse = append(sellerResponse, models.SellerResponse{
 			ID:          seller.ID,
-			User:        seller.User,
+			UserID:      seller.UserID,
+			User:        seller.User.Name,
+			Email:       seller.User.Email,
+			PhoneNumber: seller.User.PhoneNumber,
 			UserName:    seller.UserName,
 			Description: seller.Description,
 			IsVerified:  seller.IsVerified,
 		})
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
-		"message": "successfully retrieved user information",
+		"message": "successfully retrieved seller information",
 		"data": gin.H{
-			"users": sellerResponse,
+			"sellers": sellerResponse,
 		},
 	})
 }

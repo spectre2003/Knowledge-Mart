@@ -74,3 +74,14 @@ type Address struct {
 	State        string `gorm:"type:varchar(255)" validate:"required" json:"state"`
 	PinCode      string `gorm:"type:varchar(255)" validate:"required" json:"pincode"`
 }
+
+type UserCart struct {
+	ID     uint `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID uint `gorm:"not null" json:"userId"`
+	User   User `gorm:"foreignKey:UserID"`
+}
+
+type CartItems struct {
+	ProductID  uint `gorm:"not null; foreignKey:ProductID" validate:"required,number" json:"productId"`
+	UserCartID uint `gorm:"not null; foreignKey:UserCartID" validate:"required,number" json:"usercartId"`
+}

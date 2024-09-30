@@ -9,6 +9,7 @@ type ProductResponse struct {
 	Price        float64        `json:"price"`
 	Image        pq.StringArray `json:"image_url"`
 	Availability bool           `json:"availability"`
+	SellerID     uint           `json:"sellerid"`
 }
 
 type UserResponse struct {
@@ -23,8 +24,11 @@ type UserResponse struct {
 
 type SellerResponse struct {
 	ID          uint   `json:"id"`
-	User        User   `json:"user"`
+	UserID      uint   `json:"userid"`
+	User        string `json:"user"`
+	Email       string `json:"email"`
 	UserName    string `json:"name"`
+	PhoneNumber string `json:"phone_number"`
 	Description string `json:"description"`
 	IsVerified  bool   `json:"verified"`
 }
