@@ -128,3 +128,67 @@ func EditSellerProfile(c *gin.Context) {
 		},
 	})
 }
+
+func EditSellerPassword(c *gin.Context) {
+	sellerID, exists := c.Get("sellerID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "seller not authorized",
+		})
+		return
+	}
+
+	sellerIDStr, ok := sellerID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve seller information",
+		})
+		return
+	}
+
+	var Request models.EditPasswordRequest
+
+	if err := c.BindJSON(&Request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "failed to process request",
+		})
+		return
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(&Request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": err.Error(),
+		})
+		return
+	}
+	var existingSeller models.Seller
+
+	if err := database.DB.Where("id = ?", sellerIDStr).First(&existingSeller).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch user from the database",
+		})
+		return
+	}
+	err := CheckPassword(existingSeller.Password, Request.CurrentPassword)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "Incorrect user password",
+		})
+		return
+	}
+	if Request.NewPassword != Request.ConfirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "passwords doesn't match",
+		})
+		return
+	}
+}

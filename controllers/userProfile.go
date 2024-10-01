@@ -471,7 +471,7 @@ func DeleteAddress(c *gin.Context) {
 
 }
 
-func EditPssword(c *gin.Context) {
+func EditPassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{

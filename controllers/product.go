@@ -260,6 +260,68 @@ func DeleteProduct(c *gin.Context) {
 	})
 }
 
+func ListProductBySeller(c *gin.Context) {
+	sellerID, exists := c.Get("sellerID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "seller not authorized",
+		})
+		return
+	}
+
+	_, ok := sellerID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve seller information",
+		})
+		return
+	}
+
+	sellID := c.Query("id")
+	if sellID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "missing category id",
+		})
+		return
+	}
+	var products []models.Product
+	tx := database.DB.Select("*").Where("seller_id = ?", sellID).Find(&products)
+
+	if tx.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve products for the specified seller",
+		})
+		return
+	}
+
+	var productResponse []models.ProductResponse
+
+	for _, product := range products {
+		productResponse = append(productResponse, models.ProductResponse{
+			ID:           product.ID,
+			Name:         product.Name,
+			Price:        product.Price,
+			Description:  product.Description,
+			Image:        product.Image,
+			Availability: product.Availability,
+			CategoryID:   product.CategoryID,
+			SellerID:     product.SellerID,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "successfully retrieved products for category",
+		"data": gin.H{
+			"products": productResponse,
+		},
+	})
+}
+
 func SellerIdbyProductId(ProductId uint) uint {
 	var Product models.Product
 	if err := database.DB.Where("id = ?", ProductId).First(&Product).Error; err != nil {

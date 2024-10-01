@@ -10,6 +10,7 @@ type ProductResponse struct {
 	Image        pq.StringArray `json:"image_url"`
 	Availability bool           `json:"availability"`
 	SellerID     uint           `json:"sellerid"`
+	CategoryID   uint           `json:"categoryid"`
 }
 
 type UserResponse struct {

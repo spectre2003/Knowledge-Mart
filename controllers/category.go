@@ -74,6 +74,7 @@ func ListCategoryProductList(c *gin.Context) {
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
+			CategoryID:   product.CategoryID,
 		})
 	}
 

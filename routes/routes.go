@@ -41,7 +41,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.DELETE("/delete_address", controllers.DeleteAddress)
 		userRoutes.GET("/user_profile", controllers.GetUserProfile)
 		userRoutes.PUT("/edit_user_profile", controllers.EditUserProfile)
-		userRoutes.PATCH("/edit_user_password", controllers.EditPssword)
+		userRoutes.PATCH("/edit_user_password", controllers.EditPassword)
 	}
 
 	sellerRoutes := router.Group("/seller")
@@ -52,6 +52,7 @@ func RegisterRoutes(router *gin.Engine) {
 		sellerRoutes.DELETE("/delete_product", controllers.DeleteProduct)
 		sellerRoutes.GET("/seller_profile", controllers.GetSellerProfile)
 		sellerRoutes.PUT("/edit_seller", controllers.EditSellerProfile)
+		sellerRoutes.GET("/product_by_seller", controllers.ListProductBySeller)
 	}
 
 	adminRoutes := router.Group("/admin")
