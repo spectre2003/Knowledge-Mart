@@ -83,33 +83,34 @@ type Cart struct {
 }
 
 type Order struct {
-	gorm.Model
-	OrderID         string          `gorm:"unique" validate:"required" json:"orderId"`
+	OrderID         uint            `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID          uint            `gorm:"not null" json:"userId"`
 	TotalAmount     float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
 	PaymentMethod   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
 	PaymentStatus   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
 	OrderedAt       time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
-	ShippingAddress ShippingAddress `gorm:"type:json" json:"shipping_address"`
+	ShippingAddress ShippingAddress `gorm:"embedded" json:"shippingAddress"`
+	Status          string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
 type ShippingAddress struct {
-	StreetName   string `json:"street_name"`
-	StreetNumber string `json:"street_number"`
-	City         string `json:"city"`
-	State        string `json:"state"`
-	PinCode      string `json:"pincode"`
+	StreetName   string `gorm:"type:varchar(255)" json:"street_name"`
+	StreetNumber string `gorm:"type:varchar(255)" json:"street_number"`
+	City         string `gorm:"type:varchar(255)" json:"city"`
+	State        string `gorm:"type:varchar(255)" json:"state"`
+	PinCode      string `gorm:"type:varchar(20)" json:"pincode"`
 }
 
 type OrderItem struct {
-	gorm.Model
-	OrderID   string  `gorm:"not null" json:"orderId"`
-	Order     Order   `gorm:"foreignKey:OrderID"`
-	UserID    uint    `gorm:"not null" json:"userId"`
-	User      User    `gorm:"foreignKey:UserID"`
-	ProductID uint    `gorm:"not null" json:"productId"`
-	Product   Product `gorm:"foreignKey:ProductID"`
-	SellerID  uint    `gorm:"not null" json:"sellerId"` // Foreign key to Seller
-	Seller    Seller  `gorm:"foreignKey:SellerID"`
-	Price     float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	OrderItemID uint    `gorm:"primaryKey;autoIncrement" json:"orderItemId"`
+	OrderID     uint    `gorm:"not null" json:"orderId"`
+	Order       Order   `gorm:"foreignKey:OrderID"`
+	UserID      uint    `gorm:"not null" json:"userId"`
+	User        User    `gorm:"foreignKey:UserID"`
+	ProductID   uint    `gorm:"not null" json:"productId"`
+	Product     Product `gorm:"foreignKey:ProductID"`
+	SellerID    uint    `gorm:"not null" json:"sellerId"`
+	Seller      Seller  `gorm:"foreignKey:SellerID"`
+	Price       float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	Status      string  `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }

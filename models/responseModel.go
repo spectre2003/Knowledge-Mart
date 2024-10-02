@@ -80,3 +80,27 @@ type CartResponse struct {
 	Image        pq.StringArray `json:"image_url"`
 	CartID       uint           `json:"cartId"`
 }
+
+type GetSellerOrdersResponse struct {
+	OrderItemID   uint           `json:"orderItemId"`
+	OrderID       uint           `json:"orderId"`
+	UserID        uint           `json:"userId"`
+	UserName      string         `json:"userName"`
+	ProductID     uint           `json:"productId"`
+	ProductName   string         `json:"productName"`
+	Description   string         `json:"description"`
+	Image         pq.StringArray `json:"image_url"`
+	SellerID      uint           `json:"sellerId"`
+	Price         float64        `json:"price"`
+	Status        string         `json:"status"`
+	PaymentMethod string         `json:"paymentMethod"`
+}
+
+type GetSellerOrderStatusResponse struct {
+	OrderItemID uint    `json:"orderItemId"`
+	ProductID   uint    `json:"productId"`
+	SellerID    uint    `json:"sellerId"`
+	SellerName  string  `json:"sellerName"`
+	Status      string  `json:"status"`
+	Price       float64 `json:"price"`
+}

@@ -103,3 +103,8 @@ type PlaceOrder struct {
 	AddressID     uint   `validate:"required,number" json:"address_id"`
 	PaymentMethod string `validate:"required" json:"payment_method"`
 }
+
+type SellerChangeStatusRequest struct {
+	OrderItemID uint   `validate:"required,number" json:"orderItemId"`
+	Status      string `validate:"required" json:"status"`
+}
