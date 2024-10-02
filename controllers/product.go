@@ -210,7 +210,7 @@ func DeleteProduct(c *gin.Context) {
 		return
 	}
 
-	_, ok := sellerID.(uint)
+	sellerIDStr, ok := sellerID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -229,7 +229,7 @@ func DeleteProduct(c *gin.Context) {
 	}
 	SellId := SellerIdbyProductId(uint(productID))
 
-	if sellerID != SellId {
+	if sellerIDStr != SellId {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
 			"message": "unauthorized request, product is not yours",

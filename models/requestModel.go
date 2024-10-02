@@ -77,26 +77,29 @@ type EditAddresRequest struct {
 }
 
 type EditUserProfileRequest struct {
-	ID          uint   `validate:"required,number" json:"id"`
 	Name        string `json:"name"`
-	Email       string `validate:"email" json:"email"`
-	PhoneNumber string `validate:"number,len=10,numeric" json:"phone_number"`
+	Email       string `validate:"omitempty,email" json:"email"`
+	PhoneNumber string `validate:"omitempty,number,len=10,numeric" json:"phone_number"`
 	//Picture     string `json:"picture"`
 }
 
 type EditPasswordRequest struct {
-	ID              uint   `validate:"required,number" json:"id"`
 	CurrentPassword string `validate:"required" json:"currentpassword"`
 	NewPassword     string `validate:"required" json:"newpassword"`
 	ConfirmPassword string `validate:"required" json:"confirmpassword"`
 }
 
 type AddToCartRequest struct {
-	ProductID uint `gorm:"column:product_id" validate:"required,number" json:"productId"`
+	ProductID uint `validate:"required,number" json:"productId"`
 }
 
 type EditSellerProfileRequest struct {
-	ID          uint   `validate:"required,number" json:"id"`
 	UserName    string `json:"username"`
 	Description string `json:"description"`
+}
+
+type PlaceOrder struct {
+	//UserID        uint   `json:"user_id"`
+	AddressID     uint   `validate:"required,number" json:"address_id"`
+	PaymentMethod string `validate:"required" json:"payment_method"`
 }

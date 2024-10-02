@@ -69,3 +69,14 @@ type UserProfileResponse struct {
 	PhoneNumber string `json:"phone_number"`
 	Picture     string `json:"picture"`
 }
+
+type CartResponse struct {
+	ProductID    uint           `json:"productId"`
+	ProductName  string         `json:"productName"`
+	CategoryID   uint           `json:"categoryId"`
+	Description  string         `json:"description"`
+	Price        float64        `json:"price"`
+	Availability bool           `json:"availability"`
+	Image        pq.StringArray `json:"image_url"`
+	CartID       uint           `json:"cartId"`
+}

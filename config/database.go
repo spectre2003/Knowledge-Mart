@@ -20,14 +20,19 @@ func ConnectDB() {
 	} else {
 		fmt.Println("connection to database :OK")
 	}
-	DB.AutoMigrate(
+	err = DB.AutoMigrate(
 		&models.Admin{},
 		&models.User{},
 		&models.Seller{},
 		&models.Product{},
 		&models.Category{},
 		&models.Address{},
-		&models.UserCart{},
-		&models.CartItems{},
+		&models.Cart{},
+		&models.Order{},
+		&models.OrderItem{},
 	)
+	if err != nil {
+		fmt.Println("Migration failed:", err)
+	}
+
 }

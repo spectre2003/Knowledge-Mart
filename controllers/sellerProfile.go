@@ -180,15 +180,39 @@ func EditSellerPassword(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "Incorrect user password",
+			"message": "Incorrect seller password",
 		})
 		return
 	}
 	if Request.NewPassword != Request.ConfirmPassword {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "passwords doesn't match",
+			"message": "New password and confirm password do not match",
 		})
 		return
 	}
+
+	hashpassword, err := HashPassword(Request.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "error in password hashing" + err.Error(),
+		})
+		return
+	}
+
+	existingSeller.Password = hashpassword
+
+	if err := database.DB.Model(&existingSeller).Select("password").Updates(existingSeller).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to update password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "successfully updated user password",
+	})
 }
