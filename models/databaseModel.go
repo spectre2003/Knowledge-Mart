@@ -90,6 +90,7 @@ type Order struct {
 	PaymentStatus   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
 	OrderedAt       time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
 	ShippingAddress ShippingAddress `gorm:"embedded" json:"shippingAddress"`
+	SellerID        uint            `gorm:"not null" json:"sellerId"`
 	Status          string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
@@ -112,5 +113,4 @@ type OrderItem struct {
 	SellerID    uint    `gorm:"not null" json:"sellerId"`
 	Seller      Seller  `gorm:"foreignKey:SellerID"`
 	Price       float64 `gorm:"type:decimal(10,2);not null" json:"price"`
-	Status      string  `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }

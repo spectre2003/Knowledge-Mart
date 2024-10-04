@@ -1,19 +1,11 @@
 package models
 
 const (
-	OrderStatusPending        = "Pending"
-	OrderStatusShipped        = "Shipped"
-	OrderStatusOutForDelivery = "OutForDelivery"
-	OrderStatusDelivered      = "Delivered"
-	OrderStatusCanceled       = "Canceled"
-	//OrderStatusReturned  = "Returned"
-)
+	OrderStatusPending        = "pending"
+	OrderStatusShipped        = "shipped"
+	OrderStatusOutForDelivery = "outForDelivery"
+	OrderStatusDelivered      = "delivered"
+	OrderStatusCanceled       = "canceled"
 
-var StatusOptions = []string{
-	OrderStatusPending,
-	OrderStatusShipped,
-	OrderStatusDelivered,
-	OrderStatusCanceled,
-	OrderStatusOutForDelivery,
-	// OrderStatusReturned,
-}
+	PaymentStatusPaid = "Paid"
+)

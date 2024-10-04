@@ -4,7 +4,6 @@ import (
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,6 +60,7 @@ func PlaceOrder(c *gin.Context) {
 
 	var CartItems []models.Cart
 	var TotalAmount float64
+	var sellerID uint
 
 	if err := database.DB.Preload("Product").Where("user_id = ?", userIDStr).Find(&CartItems).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -88,8 +88,17 @@ func PlaceOrder(c *gin.Context) {
 			return
 		}
 		TotalAmount += Product.Price
-	}
 
+		if sellerID == 0 {
+			sellerID = Product.SellerID
+		} else if sellerID != Product.SellerID {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "You can only add products from one seller to your cart per order.",
+			})
+			return
+		}
+	}
 	var Address models.Address
 
 	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, placeOrder.AddressID).First(&Address).Error; err != nil {
@@ -104,9 +113,10 @@ func PlaceOrder(c *gin.Context) {
 		UserID:        userIDStr,
 		TotalAmount:   TotalAmount,
 		PaymentMethod: placeOrder.PaymentMethod,
-		PaymentStatus: "Pending",
+		PaymentStatus: "pending",
 		OrderedAt:     time.Now(),
-		Status:        "Pending",
+		SellerID:      sellerID,
+		Status:        "pending",
 		ShippingAddress: models.ShippingAddress{
 			StreetName:   Address.StreetName,
 			StreetNumber: Address.StreetNumber,
@@ -165,7 +175,6 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 			UserID:    UserID,
 			SellerID:  Product.SellerID,
 			Price:     Product.Price,
-			Status:    "Pending",
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {
@@ -191,7 +200,7 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 
 }
 
-func GetSellerOrders(c *gin.Context) {
+func GetUserOrders(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -210,13 +219,10 @@ func GetSellerOrders(c *gin.Context) {
 		return
 	}
 
-	var orderItems []models.OrderItem
+	var orders []models.Order
 	var orderResponses []models.GetSellerOrdersResponse
 
-	if err := database.DB.Preload("Product").
-		Preload("Order").
-		Preload("User").
-		Where("seller_id = ?", sellerIDStr).Find(&orderItems).Error; err != nil {
+	if err := database.DB.Where("seller_id = ?", sellerIDStr).Find(&orders).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
 			"message": "no orders found for this seller",
@@ -224,28 +230,39 @@ func GetSellerOrders(c *gin.Context) {
 		return
 	}
 
-	if len(orderItems) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "no orders found for this seller",
-		})
-		return
-	}
+	for _, order := range orders {
+		var orderItems []models.OrderItem
+		if err := database.DB.Where("order_id = ?", order.OrderID).Find(&orderItems).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to retrieve order items",
+			})
+			return
+		}
 
-	for _, orderItem := range orderItems {
+		var products []models.ProductArray
+		for _, item := range orderItems {
+			var product models.Product
+			if err := database.DB.Where("id = ?", item.ProductID).First(&product).Error; err == nil {
+				products = append(products, models.ProductArray{
+					ProductID:   product.ID,
+					ProductName: product.Name,
+					Description: product.Description,
+					Image:       product.Image,
+					Price:       item.Price,
+					OrderItemID: item.OrderItemID,
+				})
+			}
+		}
 		orderResponses = append(orderResponses, models.GetSellerOrdersResponse{
-			OrderItemID:   orderItem.OrderItemID,
-			OrderID:       orderItem.OrderID,
-			UserID:        orderItem.UserID,
-			UserName:      orderItem.User.Name,
-			ProductID:     orderItem.ProductID,
-			ProductName:   orderItem.Product.Name,
-			Description:   orderItem.Product.Description,
-			Image:         orderItem.Product.Image,
-			SellerID:      orderItem.SellerID,
-			Price:         orderItem.Price,
-			Status:        orderItem.Status,
-			PaymentMethod: orderItem.Order.PaymentMethod,
+			OrderID:         order.OrderID,
+			UserID:          order.UserID,
+			SellerID:        order.SellerID,
+			PaymentMethod:   order.PaymentMethod,
+			TotalAmount:     order.TotalAmount,
+			OrderStatus:     order.Status,
+			Product:         products,
+			ShippingAddress: order.ShippingAddress,
 		})
 	}
 
@@ -254,8 +271,7 @@ func GetSellerOrders(c *gin.Context) {
 		"data":   orderResponses,
 	})
 }
-
-func SellerChangeOrderStatus(c *gin.Context) {
+func SellerUpdateOrderStatus(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -274,38 +290,50 @@ func SellerChangeOrderStatus(c *gin.Context) {
 		return
 	}
 
-	var Request models.SellerChangeStatusRequest
+	orderId := c.Query("orderid")
 
-	if err := c.ShouldBindJSON(&Request); err != nil {
+	if orderId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "invalid input",
+			"message": "orderId is required",
 		})
 		return
 	}
 
-	if !IsValidStatus(Request.Status) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "invalid order status",
-		})
-		return
-	}
+	var orders models.Order
 
-	var orderItem models.OrderItem
-
-	if err := database.DB.Where("seller_id = ? AND order_item_id = ?", sellerIDStr, Request.OrderItemID).
-		First(&orderItem).Error; err != nil {
+	if err := database.DB.Where("seller_id = ? AND order_id = ?", sellerIDStr, orderId).
+		First(&orders).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "order item not found for this seller",
+			"message": "orders not found for this seller",
 		})
 		return
 	}
 
-	orderItem.Status = Request.Status
-	if err := database.DB.Model(&orderItem).Where("order_item_id = ?", orderItem.OrderItemID).
-		Update("status", orderItem.Status).Error; err != nil {
+	switch orders.Status {
+	case models.OrderStatusPending:
+		orders.Status = models.OrderStatusShipped
+	case models.OrderStatusShipped:
+		orders.Status = models.OrderStatusOutForDelivery
+	case models.OrderStatusOutForDelivery:
+		orders.Status = models.OrderStatusDelivered
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "invalid order status transition",
+		})
+		return
+	}
+
+	if orders.Status == models.OrderStatusDelivered {
+		orders.PaymentStatus = models.PaymentStatusPaid
+	}
+
+	if err := database.DB.Model(&orders).Updates(map[string]interface{}{
+		"status":         orders.Status,
+		"payment_status": orders.PaymentStatus,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
 			"message": "failed to update order status",
@@ -316,129 +344,9 @@ func SellerChangeOrderStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "order status updated successfully",
-		"data":    "Now status is  " + orderItem.Status,
-	})
-}
-
-func AdminGetSellerOrderStatuses(c *gin.Context) {
-	adminID, exists := c.Get("adminID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  "failed",
-			"message": "not authorized ",
-		})
-		return
-	}
-
-	_, ok := adminID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve admin information",
-		})
-		return
-	}
-
-	orderIDStr := c.Query("orderid")
-	orderID, err := strconv.Atoi(orderIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "invalid order ID",
-		})
-		return
-	}
-
-	var orderItems []models.OrderItem
-
-	if err := database.DB.Where("order_id = ?", orderID).Preload("Seller").Find(&orderItems).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "no order items found for this order",
-		})
-		return
-	}
-
-	var sellerStatuses []models.GetSellerOrderStatusResponse
-	for _, orderItem := range orderItems {
-		sellerStatuses = append(sellerStatuses, models.GetSellerOrderStatusResponse{
-			OrderItemID: orderItem.OrderItemID,
-			ProductID:   orderItem.ProductID,
-			SellerID:    orderItem.SellerID,
-			SellerName:  orderItem.Seller.UserName,
-			Status:      orderItem.Status,
-			Price:       orderItem.Price,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   sellerStatuses,
-	})
-}
-
-func AdminChangeOrderStatus(c *gin.Context) {
-	adminID, exists := c.Get("adminID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  "failed",
-			"message": "not authorized ",
-		})
-		return
-	}
-
-	_, ok := adminID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve admin information",
-		})
-		return
-	}
-
-	var Request models.SellerChangeStatusRequest
-
-	if err := c.ShouldBindJSON(&Request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "invalid input",
-		})
-		return
-	}
-
-	if !IsValidStatus(Request.Status) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "invalid order status",
-		})
-		return
-	}
-
-	var order models.Order
-
-	if err := database.DB.Where("order_id = ?", Request.OrderItemID).
-		First(&order).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "order not found",
-		})
-		return
-	}
-
-	order.Status = Request.Status
-	if err := database.DB.Model(&order).Where("order_id = ?", order.OrderID).
-		Update("status", order.Status).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to update order status",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "order status updated successfully",
-		"data":    "Now status is  " + order.Status,
+		"data": gin.H{
+			"newStatus": orders.Status,
+		},
 	})
 }
 
@@ -447,12 +355,12 @@ func UserCheckOrderStatus(c *gin.Context) {
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "user not authorized ",
+			"message": "user not authorized",
 		})
 		return
 	}
 
-	_, ok := userID.(uint)
+	userIDStr, ok := userID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -461,49 +369,134 @@ func UserCheckOrderStatus(c *gin.Context) {
 		return
 	}
 
-	orderIDStr := c.Query("orderid")
-	orderID, err := strconv.Atoi(orderIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "invalid order ID",
-		})
-		return
-	}
+	var orders []models.Order
 
-	var orderItems []models.Order
-
-	if err := database.DB.Where("order_id = ?", orderID).Preload("Seller").Find(&orderItems).Error; err != nil {
+	if err := database.DB.Where("user_id = ?", userIDStr).Find(&orders).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "no order items found for this order",
+			"message": "no orders found for this user",
 		})
 		return
 	}
 
-	var sellerStatuses []models.GetSellerOrderStatusResponse
-	for _, orderItem := range orderItems {
-		sellerStatuses = append(sellerStatuses, models.GetSellerOrderStatusResponse{
-			OrderItemID: orderItem.OrderItemID,
-			ProductID:   orderItem.ProductID,
-			SellerID:    orderItem.SellerID,
-			SellerName:  orderItem.Seller.UserName,
-			Status:      orderItem.Status,
-			Price:       orderItem.Price,
+	var userOrderResponses []models.UserOrderResponse
+	for _, order := range orders {
+		var orderItems []models.OrderItem
+		if err := database.DB.Preload("Product").Preload("Seller").Where("order_id = ?", order.OrderID).Find(&orderItems).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to retrieve order items",
+			})
+			return
+		}
+
+		var orderItemResponses []models.OrderItemResponse
+		for _, orderItem := range orderItems {
+			orderItemResponses = append(orderItemResponses, models.OrderItemResponse{
+				OrderItemID: orderItem.OrderItemID,
+				ProductName: orderItem.Product.Name,
+				CategoryID:  orderItem.Product.CategoryID,
+				Description: orderItem.Product.Description,
+				Price:       orderItem.Price,
+				Image:       orderItem.Product.Image,
+				SellerName:  orderItem.Seller.UserName,
+			})
+		}
+
+		userOrderResponses = append(userOrderResponses, models.UserOrderResponse{
+			OrderID:         order.OrderID,
+			OrderedAt:       order.OrderedAt,
+			TotalAmount:     order.TotalAmount,
+			Items:           orderItemResponses,
+			Status:          order.Status,
+			ShippingAddress: order.ShippingAddress,
 		})
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   sellerStatuses,
+		"data":   userOrderResponses,
 	})
 }
 
-func IsValidStatus(status string) bool {
-	for _, validStatus := range models.StatusOptions {
-		if status == validStatus {
-			return true
+func CancelOrder(c *gin.Context) {
+	sellerID, isSeller := c.Get("sellerID")
+	userID, isUser := c.Get("userID")
+
+	if !isSeller && !isUser {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "user or seller not authorized",
+		})
+		return
+	}
+
+	var id uint
+	if isSeller {
+		id = sellerID.(uint)
+	} else if isUser {
+		id = userID.(uint)
+	}
+
+	orderId := c.Query("orderid")
+
+	if orderId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "orderId is required",
+		})
+		return
+	}
+
+	var orders models.Order
+	var condition string
+	if isSeller {
+		condition = "seller_id = ? AND order_id = ?"
+	} else {
+		condition = "user_id = ? AND order_id = ?"
+	}
+
+	if err := database.DB.Where(condition, id, orderId).First(&orders).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "order not found for this user or seller",
+		})
+		return
+	}
+
+	orders.Status = models.OrderStatusCanceled
+
+	if err := database.DB.Model(&orders).Update("status", orders.Status).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to update order status",
+		})
+		return
+	}
+
+	var orderItems []models.OrderItem
+
+	if err := database.DB.Preload("Product").Where("order_id = ?", orderId).Find(&orderItems).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "order items not found for this order",
+		})
+		return
+	}
+
+	for _, orderItem := range orderItems {
+		orderItem.Product.Availability = true
+
+		if err := database.DB.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to update product availability",
+			})
+			return
 		}
 	}
-	return false
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Order cancelled successfully",
+	})
 }

@@ -1,6 +1,10 @@
 package models
 
-import "github.com/lib/pq"
+import (
+	"time"
+
+	"github.com/lib/pq"
+)
 
 type ProductResponse struct {
 	ID           uint           `json:"id"`
@@ -82,18 +86,23 @@ type CartResponse struct {
 }
 
 type GetSellerOrdersResponse struct {
-	OrderItemID   uint           `json:"orderItemId"`
-	OrderID       uint           `json:"orderId"`
-	UserID        uint           `json:"userId"`
-	UserName      string         `json:"userName"`
-	ProductID     uint           `json:"productId"`
-	ProductName   string         `json:"productName"`
-	Description   string         `json:"description"`
-	Image         pq.StringArray `json:"image_url"`
-	SellerID      uint           `json:"sellerId"`
-	Price         float64        `json:"price"`
-	Status        string         `json:"status"`
-	PaymentMethod string         `json:"paymentMethod"`
+	OrderID         uint            `json:"orderId"`
+	UserID          uint            `json:"userId"`
+	SellerID        uint            `json:"sellerId"`
+	PaymentMethod   string          `json:"paymentMethod"`
+	OrderStatus     string          `json:"orderStatus"`
+	TotalAmount     float64         `json:"totalAmount"`
+	Product         []ProductArray  `json:"products"`
+	ShippingAddress ShippingAddress `json:"shippingAddress"`
+}
+
+type ProductArray struct {
+	ProductID   uint           `json:"productId"`
+	ProductName string         `json:"productName"`
+	Description string         `json:"description"`
+	Image       pq.StringArray `json:"image_url"`
+	Price       float64        `json:"price"`
+	OrderItemID uint           `json:"orderItemId"`
 }
 
 type GetSellerOrderStatusResponse struct {
@@ -103,4 +112,23 @@ type GetSellerOrderStatusResponse struct {
 	SellerName  string  `json:"sellerName"`
 	Status      string  `json:"status"`
 	Price       float64 `json:"price"`
+}
+
+type UserOrderResponse struct {
+	OrderID         uint                `json:"orderId"`
+	OrderedAt       time.Time           `json:"orderedAt"`
+	TotalAmount     float64             `json:"totalAmount"`
+	Items           []OrderItemResponse `json:"items"`
+	ShippingAddress ShippingAddress     `json:"shippingAddress"`
+	Status          string              `json:"orderStatus"`
+}
+
+type OrderItemResponse struct {
+	OrderItemID uint           `json:"orderItemId"`
+	ProductName string         `json:"productName"`
+	Image       pq.StringArray `json:"image_url"`
+	CategoryID  uint           `json:"categoryId"`
+	Description string         `json:"description"`
+	Price       float64        `json:"price"`
+	SellerName  string         `json:"sellerName"`
 }

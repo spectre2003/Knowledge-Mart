@@ -46,6 +46,8 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/cart_view", controllers.ListAllCart)
 		userRoutes.DELETE("/remove_cart", controllers.RemoveItemFromCart)
 		userRoutes.POST("/order_place", controllers.PlaceOrder)
+		userRoutes.GET("/my_orders", controllers.UserCheckOrderStatus)
+		userRoutes.PATCH("/order_cancel", controllers.CancelOrder)
 	}
 
 	sellerRoutes := router.Group("/seller")
@@ -58,8 +60,9 @@ func RegisterRoutes(router *gin.Engine) {
 		sellerRoutes.PUT("/edit_seller", controllers.EditSellerProfile)
 		sellerRoutes.PATCH("/edit_seller_password", controllers.EditSellerPassword)
 		sellerRoutes.GET("/product_by_seller", controllers.ListProductBySeller)
-		sellerRoutes.GET("/order_list", controllers.GetSellerOrders)
-		sellerRoutes.PATCH("/update_order_status", controllers.SellerChangeOrderStatus)
+		sellerRoutes.GET("/order_list", controllers.GetUserOrders)
+		sellerRoutes.PATCH("/update_order_status", controllers.SellerUpdateOrderStatus)
+		sellerRoutes.PATCH("/order_cancel", controllers.CancelOrder)
 	}
 
 	adminRoutes := router.Group("/admin")
@@ -75,8 +78,6 @@ func RegisterRoutes(router *gin.Engine) {
 		adminRoutes.GET("/all_seller", controllers.ListAllSellers)
 		adminRoutes.PATCH("/verify_seller", controllers.VerifySeller)
 		adminRoutes.PATCH("/not_verified_seller", controllers.NotVerifySeller)
-		adminRoutes.GET("/seller_order_status", controllers.AdminGetSellerOrderStatuses)
-		adminRoutes.PATCH("/update_order_status", controllers.AdminChangeOrderStatus)
 	}
 
 }

@@ -15,7 +15,7 @@ func AddToCart(c *gin.Context) {
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "user not authorized ",
+			"message": "user not authorized",
 		})
 		return
 	}
@@ -30,7 +30,6 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var Request models.AddToCartRequest
-
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
@@ -49,7 +48,6 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var Product models.Product
-
 	if err := database.DB.Where("id = ?", Request.ProductID).First(&Product).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
@@ -67,13 +65,28 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var existingCartItem models.Cart
-
 	if err := database.DB.Where("product_id = ? AND user_id = ?", Request.ProductID, UserIDStr).First(&existingCartItem).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "Product is already in your cart.",
+			"message": "This product is already in your cart.",
 		})
 		return
+	}
+
+	var userCartItems []models.Cart
+	if err := database.DB.Where("user_id = ?", UserIDStr).Find(&userCartItems).Error; err == nil {
+		for _, cartItem := range userCartItems {
+			var cartProduct models.Product
+			if err := database.DB.Where("id = ?", cartItem.ProductID).First(&cartProduct).Error; err == nil {
+				if cartProduct.SellerID != Product.SellerID {
+					c.JSON(http.StatusBadRequest, gin.H{
+						"status":  "failed",
+						"message": "You can only add products from one seller at a time. Please complete or clear your current cart before adding products from a different seller.",
+					})
+					return
+				}
+			}
+		}
 	}
 
 	cart := models.Cart{
@@ -83,7 +96,7 @@ func AddToCart(c *gin.Context) {
 
 	if err := database.DB.Create(&cart).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "fails",
+			"status":  "failed",
 			"message": "Failed to add product to cart. Please try again later.",
 		})
 		return
@@ -93,7 +106,6 @@ func AddToCart(c *gin.Context) {
 		"status":  "success",
 		"message": "Product added to cart successfully",
 	})
-
 }
 
 func ListAllCart(c *gin.Context) {
