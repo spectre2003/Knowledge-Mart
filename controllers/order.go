@@ -318,16 +318,19 @@ func SellerUpdateOrderStatus(c *gin.Context) {
 		orders.Status = models.OrderStatusOutForDelivery
 	case models.OrderStatusOutForDelivery:
 		orders.Status = models.OrderStatusDelivered
+		orders.PaymentStatus = models.PaymentStatusPaid
+	case models.OrderStatusCanceled:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Order is cancelled cannot update order status",
+		})
+		return
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": "invalid order status transition",
 		})
 		return
-	}
-
-	if orders.Status == models.OrderStatusDelivered {
-		orders.PaymentStatus = models.PaymentStatusPaid
 	}
 
 	if err := database.DB.Model(&orders).Updates(map[string]interface{}{

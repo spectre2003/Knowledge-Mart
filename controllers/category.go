@@ -53,7 +53,7 @@ func ListCategoryProductList(c *gin.Context) {
 	}
 
 	var products []models.Product
-	tx := database.DB.Select("*").Where("category_id = ?", catid).Find(&products)
+	tx := database.DB.Select("*").Where("category_id = ? AND availability = ?", catid, true).Find(&products)
 
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -228,7 +228,6 @@ func EditCategory(c *gin.Context) {
 		return
 	}
 
-	// Success response
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully updated category",
@@ -242,7 +241,6 @@ func EditCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
-	// Retrieve the adminID to verify authorization
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -261,7 +259,6 @@ func DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	// Retrieve the categoryID from query parameters
 	categoryIDStr := c.Query("categoryid")
 	if categoryIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -272,7 +269,6 @@ func DeleteCategory(c *gin.Context) {
 	}
 
 	var category models.Category
-	// Fetch the category using the categoryID
 	if err := database.DB.First(&category, categoryIDStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -281,27 +277,16 @@ func DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	// Check if there are products associated with this category
-	var productCount int64
-	result := database.DB.Model(&models.Product{}).Where("category_id = ?", category.ID).Count(&productCount)
-
-	if result.Error != nil {
+	if err := database.DB.Model(&models.Product{}).
+		Where("category_id = ?", category.ID).
+		Update("category_id", nil).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "failed to check products for this category",
+			"message": "failed to update products in the category",
 		})
 		return
 	}
 
-	if productCount > 0 {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"status":  "failed",
-			"message": "category contains products, change the category of these products before using this endpoint",
-		})
-		return
-	}
-
-	// Delete the category from the database
 	if err := database.DB.Delete(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",

@@ -44,6 +44,7 @@ type EditProductRequest struct {
 	Price        float64        `json:"price"`
 	Image        pq.StringArray `json:"image_url"`
 	Availability *bool          `json:"availability"`
+	CategoryID   uint           `json:"categoryid"`
 }
 
 type AddCategoryRequest struct {
@@ -65,6 +66,7 @@ type AddAddresRequest struct {
 	City         string `validate:"required" json:"city"`
 	State        string `validate:"required" json:"state"`
 	Pincode      string `validate:"required" json:"pincode"`
+	PhoneNumber  string `validate:"required" json:"phone_number"`
 }
 
 type EditAddresRequest struct {
@@ -74,6 +76,7 @@ type EditAddresRequest struct {
 	City         string `json:"city"`
 	State        string `json:"state"`
 	Pincode      string `json:"pincode"`
+	PhoneNumber  string `json:"phone_number"`
 }
 
 type EditUserProfileRequest struct {

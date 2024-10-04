@@ -9,7 +9,7 @@ import (
 
 type Admin struct {
 	gorm.Model
-	ID       uint   `gorm:"primaryKey;autoIncrement" json:"id"` // Changed to uppercase ID for consistency
+	ID       uint   `gorm:"primaryKey;autoIncrement" json:"id"`
 	Email    string `gorm:"type:varchar(255);unique" validate:"required,email" json:"email"`
 	Password string `gorm:"type:varchar(255)" validate:"required" json:"password"`
 }
@@ -55,7 +55,7 @@ type Product struct {
 	SellerID     uint           `gorm:"not null;constraint:OnDelete:CASCADE;" json:"sellerId"`
 	Seller       Seller         `gorm:"foreignKey:SellerID"`
 	Name         string         `gorm:"type:varchar(255)" validate:"required" json:"name"`
-	CategoryID   uint           `gorm:"not null;constraint:OnDelete:CASCADE;" json:"categoryId"`
+	CategoryID   uint           `gorm:"constraint:OnDelete:CASCADE;" json:"categoryId"`
 	Category     Category       `gorm:"foreignKey:CategoryID"`
 	Description  string         `gorm:"type:varchar(255)" validate:"required" json:"description"`
 	Availability bool           `gorm:"type:bool;default:true" json:"availability"`
@@ -72,6 +72,7 @@ type Address struct {
 	City         string `gorm:"type:varchar(255)" validate:"required" json:"city"`
 	State        string `gorm:"type:varchar(255)" validate:"required" json:"state"`
 	PinCode      string `gorm:"type:varchar(255)" validate:"required" json:"pincode"`
+	PhoneNumber  string `gorm:"type:varchar(255);unique" validate:"number" json:"phone_number"`
 }
 
 type Cart struct {
@@ -100,6 +101,7 @@ type ShippingAddress struct {
 	City         string `gorm:"type:varchar(255)" json:"city"`
 	State        string `gorm:"type:varchar(255)" json:"state"`
 	PinCode      string `gorm:"type:varchar(20)" json:"pincode"`
+	PhoneNumber  string `gorm:"type:varchar(20)" json:"phonenumber"`
 }
 
 type OrderItem struct {

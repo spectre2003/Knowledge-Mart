@@ -15,6 +15,7 @@ type ProductResponse struct {
 	Availability bool           `json:"availability"`
 	SellerID     uint           `json:"sellerid"`
 	CategoryID   uint           `json:"categoryid"`
+	//CategoryName string         `json:"category_name"`
 }
 
 type UserResponse struct {
@@ -58,13 +59,12 @@ type GoogleResponse struct {
 
 type AddressResponse struct {
 	ID           uint   `json:"id"`
-	Username     string `json:"name"`
 	StreetName   string `json:"streetname"`
 	StreetNumber string `json:"streetNumber"`
 	City         string `json:"city"`
 	State        string `json:"state"`
 	PinCode      string `json:"pincode"`
-	Phone        string `json:"phoneNumber"`
+	PhoneNumber  string `json:"phoneNumber"`
 }
 
 type UserProfileResponse struct {

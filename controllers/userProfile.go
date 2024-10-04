@@ -242,6 +242,7 @@ func AddAddress(c *gin.Context) {
 		City:         request.City,
 		State:        request.State,
 		PinCode:      request.Pincode,
+		PhoneNumber:  request.PhoneNumber,
 	}
 	if err := database.DB.Create(&newAddress).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -251,13 +252,12 @@ func AddAddress(c *gin.Context) {
 		return
 	}
 	addressResponse := models.AddressResponse{
-		Username:     user.Name,
 		StreetName:   newAddress.StreetName,
 		StreetNumber: newAddress.StreetNumber,
 		City:         newAddress.City,
 		State:        newAddress.State,
 		PinCode:      newAddress.PinCode,
-		Phone:        user.PhoneNumber,
+		PhoneNumber:  newAddress.PhoneNumber,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -310,13 +310,12 @@ func ListAllAddress(c *gin.Context) {
 	for _, address := range Addresses {
 		AddressResponse = append(AddressResponse, models.AddressResponse{
 			ID:           address.ID,
-			Username:     user.Name,
 			StreetName:   address.StreetName,
 			StreetNumber: address.StreetNumber,
 			City:         address.City,
 			State:        address.State,
 			PinCode:      address.PinCode,
-			Phone:        user.PhoneNumber,
+			PhoneNumber:  address.PhoneNumber,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -390,6 +389,9 @@ func EditAddress(c *gin.Context) {
 	if request.Pincode != "" {
 		existingAddress.PinCode = request.Pincode
 	}
+	if request.PhoneNumber != "" {
+		existingAddress.PhoneNumber = request.PhoneNumber
+	}
 
 	if err := database.DB.Model(&existingAddress).Updates(existingAddress).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -409,6 +411,7 @@ func EditAddress(c *gin.Context) {
 			"city":         existingAddress.City,
 			"state":        existingAddress.State,
 			"pincode":      existingAddress.PinCode,
+			"phonenumber":  existingAddress.PhoneNumber,
 		},
 	})
 }

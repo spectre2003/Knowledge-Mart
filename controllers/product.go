@@ -11,7 +11,6 @@ import (
 )
 
 func AddProduct(c *gin.Context) {
-	// Retrieve sellerID from context and check for its existence
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -30,7 +29,6 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	// Parse the request body
 	var request models.AddProductRequest
 
 	if err := c.BindJSON(&request); err != nil {
@@ -41,7 +39,6 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	// Validate the request
 	validate := validator.New()
 	if err := validate.Struct(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -51,7 +48,15 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	// Check if product with the same name already exists for this seller
+	var category models.Category
+	if err := database.DB.First(&category, request.CategoryID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "invalid category ID",
+		})
+		return
+	}
+
 	var existingProduct models.Product
 
 	if err := database.DB.Where("name = ? AND seller_id = ? AND deleted_at IS NULL", request.Name, sellerIDUint).First(&existingProduct).Error; err == nil {
@@ -62,7 +67,14 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	// Create a new product
+	if request.Price <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "product price must be a positive integer",
+		})
+		return
+	}
+
 	newProduct := models.Product{
 		SellerID:     sellerID.(uint),
 		CategoryID:   request.CategoryID,
@@ -70,10 +82,8 @@ func AddProduct(c *gin.Context) {
 		Description:  request.Description,
 		Price:        request.Price,
 		Image:        request.Image,
-		Availability: true, // Assuming products are available by default
+		Availability: true,
 	}
-
-	// Save the new product in the database
 	if err := database.DB.Create(&newProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -82,7 +92,6 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	// Respond with success
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully added new product",
@@ -166,6 +175,13 @@ func EditProduct(c *gin.Context) {
 	}
 
 	if Request.Price != 0 {
+		if Request.Price <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "price must be a positive number",
+			})
+			return
+		}
 		existingProduct.Price = Request.Price
 	}
 
@@ -177,7 +193,19 @@ func EditProduct(c *gin.Context) {
 		existingProduct.Availability = *Request.Availability
 	}
 
-	// Use Select to update all fields including Availability
+	if Request.CategoryID != 0 {
+
+		var category models.Category
+		if err := database.DB.First(&category, Request.CategoryID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "invalid category ID",
+			})
+			return
+		}
+
+		existingProduct.CategoryID = Request.CategoryID
+	}
 	if err := database.DB.Model(&existingProduct).Updates(existingProduct).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -196,6 +224,7 @@ func EditProduct(c *gin.Context) {
 			"price":        existingProduct.Price,
 			"image":        existingProduct.Image,
 			"availability": existingProduct.Availability,
+			"categoryID":   existingProduct.CategoryID,
 		},
 	})
 }
@@ -352,6 +381,7 @@ func ListAllProduct(c *gin.Context) {
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
+			CategoryID:   product.CategoryID,
 		})
 	}
 

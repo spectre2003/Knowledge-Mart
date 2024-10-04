@@ -61,7 +61,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		})
 		return
 	}
-	// Exchange code for token
 	token, err := googleOauthConfig.Exchange(context.Background(), code)
 	if err != nil {
 		log.Printf("Token Exchange Error: %v", err)
@@ -72,7 +71,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Use access token to get user info
 	response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -83,7 +81,6 @@ func GoogleHandleCallback(c *gin.Context) {
 	}
 	defer response.Body.Close()
 
-	// Read response body
 	content, err := io.ReadAll(response.Body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -93,7 +90,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Parse the Google user information
 	var googleUser models.GoogleResponse
 	err = json.Unmarshal(content, &googleUser)
 	if err != nil {
@@ -104,11 +100,9 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Check if the user already exists in the database
 	var existingUser models.User
 	if err := database.DB.Where("email = ?", googleUser.Email).First(&existingUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// Create a new user if not found
 			newUser := models.User{
 				Email:       googleUser.Email,
 				Name:        googleUser.Name,
