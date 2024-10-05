@@ -66,6 +66,14 @@ func ListCategoryProductList(c *gin.Context) {
 	var productResponse []models.ProductResponse
 
 	for _, product := range products {
+		var seller models.Seller
+		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to retrieve seller rating",
+			})
+			return
+		}
 		productResponse = append(productResponse, models.ProductResponse{
 			ID:           product.ID,
 			Name:         product.Name,
@@ -75,6 +83,7 @@ func ListCategoryProductList(c *gin.Context) {
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
 			CategoryID:   product.CategoryID,
+			SellerRating: seller.AverageRating,
 		})
 	}
 

@@ -149,6 +149,9 @@ func EditUserProfile(c *gin.Context) {
 		})
 		return
 	}
+	if Request.Picture != "" {
+		existingUser.Picture = Request.Picture
+	}
 
 	if Request.PhoneNumber != "" {
 		existingUser.PhoneNumber = Request.PhoneNumber
@@ -168,6 +171,7 @@ func EditUserProfile(c *gin.Context) {
 			"name":         existingUser.Name,
 			"email":        existingUser.Email,
 			"phone_number": existingUser.PhoneNumber,
+			"picture":      existingUser.Picture,
 		},
 	})
 
@@ -251,21 +255,18 @@ func AddAddress(c *gin.Context) {
 		})
 		return
 	}
-	addressResponse := models.AddressResponse{
-		StreetName:   newAddress.StreetName,
-		StreetNumber: newAddress.StreetNumber,
-		City:         newAddress.City,
-		State:        newAddress.State,
-		PinCode:      newAddress.PinCode,
-		PhoneNumber:  newAddress.PhoneNumber,
-	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully added new address",
-		"data": gin.H{
-			"id":      newAddress.ID,
-			"address": addressResponse,
+		"address": gin.H{
+			"id":            newAddress.ID,
+			"street_name":   newAddress.StreetName,
+			"street_number": newAddress.StreetNumber,
+			"city":          newAddress.City,
+			"state":         newAddress.State,
+			"pincode":       newAddress.PinCode,
+			"phone_number":  newAddress.PhoneNumber,
 		},
 	})
 }

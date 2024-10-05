@@ -83,7 +83,7 @@ type EditUserProfileRequest struct {
 	Name        string `json:"name"`
 	Email       string `validate:"omitempty,email" json:"email"`
 	PhoneNumber string `validate:"omitempty,number,len=10,numeric" json:"phone_number"`
-	//Picture     string `json:"picture"`
+	Picture     string `json:"picture"`
 }
 
 type EditPasswordRequest struct {
@@ -101,13 +101,12 @@ type EditSellerProfileRequest struct {
 	Description string `json:"description"`
 }
 
-type PlaceOrder struct {
-	//UserID        uint   `json:"user_id"`
-	AddressID     uint   `validate:"required,number" json:"address_id"`
-	PaymentMethod string `validate:"required" json:"payment_method"`
-}
-
 type ChangeOrderStatusRequest struct {
 	OrderItemID uint `validate:"required,number" json:"orderItemId"`
 	//Status      string `validate:"required" json:"status"`
+}
+
+type RatingRequest struct {
+	SellerID uint    `json:"seller_id" binding:"required"`
+	Rating   float64 `json:"rating" binding:"required,min=1,max=5"`
 }

@@ -35,6 +35,7 @@ func RegisterRoutes(router *gin.Engine) {
 	router.GET("/product_new", controllers.SearchProductNew)
 	router.GET("/product_a_to_z", controllers.SearchProductAtoZ)
 	router.GET("/product_z_to_a", controllers.SearchProductZtoA)
+	router.GET("/product_popularity", controllers.SearchProductHighRatedFirst)
 
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.AuthRequired)
@@ -54,6 +55,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/my_orders", controllers.UserCheckOrderStatus)
 		userRoutes.PATCH("/order_cancel", controllers.CancelOrder)
 		userRoutes.POST("/file_upload", controllers.UploadFile)
+		userRoutes.POST("/seller_rating", controllers.SellerRating)
 	}
 
 	sellerRoutes := router.Group("/seller")

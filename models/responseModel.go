@@ -15,7 +15,7 @@ type ProductResponse struct {
 	Availability bool           `json:"availability"`
 	SellerID     uint           `json:"sellerid"`
 	CategoryID   uint           `json:"categoryid"`
-	//CategoryName string         `json:"category_name"`
+	SellerRating float64        `json:"sellerRating"`
 }
 
 type UserResponse struct {
@@ -29,14 +29,15 @@ type UserResponse struct {
 }
 
 type SellerResponse struct {
-	ID          uint   `json:"id"`
-	UserID      uint   `json:"userid"`
-	User        string `json:"user"`
-	Email       string `json:"email"`
-	UserName    string `json:"name"`
-	PhoneNumber string `json:"phone_number"`
-	Description string `json:"description"`
-	IsVerified  bool   `json:"verified"`
+	ID           uint    `json:"id"`
+	UserID       uint    `json:"userid"`
+	User         string  `json:"user"`
+	Email        string  `json:"email"`
+	UserName     string  `json:"name"`
+	PhoneNumber  string  `json:"phone_number"`
+	Description  string  `json:"description"`
+	IsVerified   bool    `json:"verified"`
+	SellerRating float64 `json:"sellerRating"`
 }
 
 type CatgoryResponse struct {
@@ -83,6 +84,7 @@ type CartResponse struct {
 	Availability bool           `json:"availability"`
 	Image        pq.StringArray `json:"image_url"`
 	CartID       uint           `json:"cartId"`
+	SellerRating float64        `json:"sellerRating"`
 }
 
 type GetSellerOrdersResponse struct {
@@ -90,6 +92,7 @@ type GetSellerOrdersResponse struct {
 	UserID          uint            `json:"userId"`
 	SellerID        uint            `json:"sellerId"`
 	PaymentMethod   string          `json:"paymentMethod"`
+	PaymentStatus   string          `json:"paymentStatus"`
 	OrderStatus     string          `json:"orderStatus"`
 	TotalAmount     float64         `json:"totalAmount"`
 	Product         []ProductArray  `json:"products"`
@@ -118,9 +121,10 @@ type UserOrderResponse struct {
 	OrderID         uint                `json:"orderId"`
 	OrderedAt       time.Time           `json:"orderedAt"`
 	TotalAmount     float64             `json:"totalAmount"`
-	Items           []OrderItemResponse `json:"items"`
 	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 	Status          string              `json:"orderStatus"`
+	PaymentStatus   string              `json:"paymentStatus"`
+	Items           []OrderItemResponse `json:"items"`
 }
 
 type OrderItemResponse struct {

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
@@ -156,9 +157,21 @@ func ListAllCart(c *gin.Context) {
 
 	var CartResponse []models.CartResponse
 	var TotalAmount float64
+	ItemCount := 0
 
 	for _, cart := range Carts {
 		TotalAmount += cart.Product.Price
+		ItemCount++
+
+		var seller models.Seller
+		if err := database.DB.Where("id = ?", cart.Product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to retrieve seller rating",
+			})
+			return
+		}
+
 		CartResponse = append(CartResponse, models.CartResponse{
 			ProductID:    cart.ProductID,
 			ProductName:  cart.Product.Name,
@@ -168,15 +181,19 @@ func ListAllCart(c *gin.Context) {
 			Availability: cart.Product.Availability,
 			Image:        cart.Product.Image,
 			CartID:       cart.ID,
+			SellerRating: seller.AverageRating,
 		})
 	}
+
+	formattedTotalAmount := fmt.Sprintf("%.2f", TotalAmount)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully get all the cart items",
 		"data": gin.H{
 			"Cart":         CartResponse,
-			"Total Amount": TotalAmount,
+			"Total Amount": formattedTotalAmount,
+			"Item Count":   ItemCount,
 		},
 	})
 }

@@ -31,13 +31,14 @@ type User struct {
 
 type Seller struct {
 	gorm.Model
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID      uint   `gorm:"not null;constraint:OnDelete:CASCADE;" json:"userId"` // Foreign key for User
-	User        User   `gorm:"foreignKey:UserID"`                                   // Association to User
-	UserName    string `gorm:"type:varchar(255)" validate:"required" json:"name"`
-	Password    string `gorm:"type:varchar(255)" validate:"required" json:"password"`
-	Description string `gorm:"type:varchar(255)" validate:"required" json:"description"`
-	IsVerified  bool   `gorm:"type:bool" json:"verified"`
+	ID            uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID        uint    `gorm:"not null;constraint:OnDelete:CASCADE;" json:"userId"`
+	User          User    `gorm:"foreignKey:UserID"`
+	UserName      string  `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	Password      string  `gorm:"type:varchar(255)" validate:"required" json:"password"`
+	Description   string  `gorm:"type:varchar(255)" validate:"required" json:"description"`
+	IsVerified    bool    `gorm:"type:bool" json:"verified"`
+	AverageRating float64 `gorm:"type:decimal(10,2)" json:"averageRating"`
 }
 
 type Category struct {
@@ -115,4 +116,11 @@ type OrderItem struct {
 	SellerID    uint    `gorm:"not null" json:"sellerId"`
 	Seller      Seller  `gorm:"foreignKey:SellerID"`
 	Price       float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+}
+
+type SellerRating struct {
+	ID       uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID   uint    `gorm:"not null" json:"userId"`
+	SellerID uint    `gorm:"not null" json:"sellerId"`
+	Rating   float64 `gorm:"not null" json:"rating"`
 }

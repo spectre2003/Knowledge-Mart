@@ -4,10 +4,10 @@ import (
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 )
 
 func PlaceOrder(c *gin.Context) {
@@ -29,21 +29,12 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	var placeOrder models.PlaceOrder
-
-	if err := c.BindJSON(&placeOrder); err != nil {
+	addressIDStr := c.Query("addressid")
+	addressID, err := strconv.Atoi(addressIDStr)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "failed to bind the json",
-		})
-		return
-	}
-
-	validate := validator.New()
-	if err := validate.Struct(&placeOrder); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": err.Error(),
+			"message": "invalid address ID",
 		})
 		return
 	}
@@ -101,7 +92,7 @@ func PlaceOrder(c *gin.Context) {
 	}
 	var Address models.Address
 
-	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, placeOrder.AddressID).First(&Address).Error; err != nil {
+	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, addressID).First(&Address).Error; err != nil {
 		c.JSON(http.StatusConflict, gin.H{
 			"status":  "failed",
 			"message": "invalid address, please retry with user's address",
@@ -112,17 +103,18 @@ func PlaceOrder(c *gin.Context) {
 	order := models.Order{
 		UserID:        userIDStr,
 		TotalAmount:   TotalAmount,
-		PaymentMethod: placeOrder.PaymentMethod,
-		PaymentStatus: "pending",
+		PaymentMethod: "COD",
+		PaymentStatus: models.OrderStatusPending,
 		OrderedAt:     time.Now(),
 		SellerID:      sellerID,
-		Status:        "pending",
+		Status:        models.OrderStatusPending,
 		ShippingAddress: models.ShippingAddress{
 			StreetName:   Address.StreetName,
 			StreetNumber: Address.StreetNumber,
 			City:         Address.City,
 			State:        Address.State,
 			PinCode:      Address.PinCode,
+			PhoneNumber:  Address.PhoneNumber,
 		},
 	}
 
@@ -259,6 +251,7 @@ func GetUserOrders(c *gin.Context) {
 			UserID:          order.UserID,
 			SellerID:        order.SellerID,
 			PaymentMethod:   order.PaymentMethod,
+			PaymentStatus:   order.PaymentStatus,
 			TotalAmount:     order.TotalAmount,
 			OrderStatus:     order.Status,
 			Product:         products,
@@ -319,10 +312,24 @@ func SellerUpdateOrderStatus(c *gin.Context) {
 	case models.OrderStatusOutForDelivery:
 		orders.Status = models.OrderStatusDelivered
 		orders.PaymentStatus = models.PaymentStatusPaid
-	case models.OrderStatusCanceled:
+	case models.OrderStatusDelivered:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "Order is cancelled cannot update order status",
+			"message": "Order is already delivered",
+		})
+		return
+	case models.OrderStatusCanceled:
+		orders.PaymentStatus = models.PaymetnStatusCanceled
+		if err := database.DB.Model(&orders).Update("payment_status", orders.PaymentStatus).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to update payment status",
+			})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Order is cancelled and cannot be updated",
 		})
 		return
 	default:
@@ -332,7 +339,6 @@ func SellerUpdateOrderStatus(c *gin.Context) {
 		})
 		return
 	}
-
 	if err := database.DB.Model(&orders).Updates(map[string]interface{}{
 		"status":         orders.Status,
 		"payment_status": orders.PaymentStatus,
@@ -412,6 +418,7 @@ func UserCheckOrderStatus(c *gin.Context) {
 			TotalAmount:     order.TotalAmount,
 			Items:           orderItemResponses,
 			Status:          order.Status,
+			PaymentStatus:   order.PaymentStatus,
 			ShippingAddress: order.ShippingAddress,
 		})
 	}

@@ -53,6 +53,7 @@ func GetSellerProfile(c *gin.Context) {
 			"seller name":        seller.User.Name,
 			"describtion":        seller.Description,
 			"seller id":          seller.ID,
+			"average rating":     seller.AverageRating,
 		},
 	})
 }

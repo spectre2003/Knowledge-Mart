@@ -31,8 +31,8 @@ func ConnectDB() {
 		&models.Category{},
 		&models.Address{},
 		&models.Cart{},
+		&models.SellerRating{},
 		&models.Order{},
-		//&models.OrderItem{},
 	)
 	if err != nil {
 		fmt.Println("Migration failed:", err)

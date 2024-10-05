@@ -7,5 +7,6 @@ const (
 	OrderStatusDelivered      = "delivered"
 	OrderStatusCanceled       = "canceled"
 
-	PaymentStatusPaid = "Paid"
+	PaymentStatusPaid     = "Paid"
+	PaymetnStatusCanceled = "Canceled"
 )

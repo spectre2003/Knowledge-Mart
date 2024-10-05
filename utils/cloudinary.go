@@ -30,7 +30,10 @@ func UploadFileToCloudinary(filePath string) (string, error) {
 
 	ctx := context.Background()
 
-	uploadResult, err := cld.Upload.Upload(ctx, filePath, uploader.UploadParams{})
+	// Make sure to set ResourceType to "raw"
+	uploadResult, err := cld.Upload.Upload(ctx, filePath, uploader.UploadParams{
+		ResourceType: "raw", // This is important for PDF and non-image files
+	})
 	if err != nil {
 		return "", err
 	}
