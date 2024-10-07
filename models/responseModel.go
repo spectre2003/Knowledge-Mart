@@ -83,7 +83,7 @@ type CartResponse struct {
 	Price        float64        `json:"price"`
 	Availability bool           `json:"availability"`
 	Image        pq.StringArray `json:"image_url"`
-	CartID       uint           `json:"cartId"`
+	ID           uint           `json:"Id"`
 	SellerRating float64        `json:"sellerRating"`
 }
 

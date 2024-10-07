@@ -110,3 +110,8 @@ type RatingRequest struct {
 	SellerID uint    `json:"seller_id" binding:"required"`
 	Rating   float64 `json:"rating" binding:"required,min=1,max=5"`
 }
+
+type InitiatePayment struct {
+	OrderID string  `json:"order_id" binding:"required"`
+	Amount  float64 `json:"amount" binding:"required"`
+}

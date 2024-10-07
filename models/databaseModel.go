@@ -125,3 +125,21 @@ type SellerRating struct {
 	SellerID uint    `gorm:"not null" json:"sellerId"`
 	Rating   float64 `gorm:"not null" json:"rating"`
 }
+
+type WhishList struct {
+	ID        uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID    uint    `gorm:"not null" json:"userId"`
+	User      User    `gorm:"foreignKey:UserID"`
+	ProductID uint    `gorm:"not null" json:"productId"`
+	Product   Product `gorm:"foreignKey:ProductID"`
+}
+
+type Payment struct {
+	ID                uint   `gorm:"primaryKey"`
+	OrderID           string `gorm:"not null"`           // Link to your Order table
+	RazorpayOrderID   string `gorm:"not null"`           // Razorpay's order ID
+	RazorpayPaymentID string `gorm:"default:null"`       // Razorpay payment ID after payment completion
+	RazorpaySignature string `gorm:"default:null"`       // Signature for verification
+	PaymentGateway    string `gorm:"default:'Razorpay'"` // Could be Razorpay or another payment gateway
+	PaymentStatus     string `gorm:"not null"`           // E.g., Pending, Confirmed
+}

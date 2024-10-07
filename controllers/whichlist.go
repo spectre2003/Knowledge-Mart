@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
@@ -11,7 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func AddToCart(c *gin.Context) {
+func AddToWhishList(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -29,7 +28,6 @@ func AddToCart(c *gin.Context) {
 		})
 		return
 	}
-
 	var Request models.AddToCartRequest
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -38,7 +36,6 @@ func AddToCart(c *gin.Context) {
 		})
 		return
 	}
-
 	validate := validator.New()
 	if err := validate.Struct(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -65,51 +62,35 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
-	var existingCartItem models.Cart
-	if err := database.DB.Where("product_id = ? AND user_id = ?", Request.ProductID, UserIDStr).First(&existingCartItem).Error; err == nil {
+	var existingWhishList models.WhishList
+
+	if err := database.DB.Where("product_id = ? AND user_id = ?", Request.ProductID, UserIDStr).First(&existingWhishList).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "This product is already in your cart.",
+			"message": "This product is already in your whishlist.",
 		})
 		return
 	}
 
-	var userCartItems []models.Cart
-	if err := database.DB.Where("user_id = ?", UserIDStr).Find(&userCartItems).Error; err == nil {
-		for _, cartItem := range userCartItems {
-			var cartProduct models.Product
-			if err := database.DB.Where("id = ?", cartItem.ProductID).First(&cartProduct).Error; err == nil {
-				if cartProduct.SellerID != Product.SellerID {
-					c.JSON(http.StatusBadRequest, gin.H{
-						"status":  "failed",
-						"message": "You can only add products from one seller at a time. Please complete or clear your current cart before adding products from a different seller.",
-					})
-					return
-				}
-			}
-		}
-	}
-
-	cart := models.Cart{
+	whishlist := models.WhishList{
 		ProductID: Request.ProductID,
 		UserID:    UserIDStr,
 	}
 
-	if err := database.DB.Create(&cart).Error; err != nil {
+	if err := database.DB.Create(&whishlist).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "Failed to add product to cart. Please try again later.",
+			"message": "Failed to add product to whishlist. Please try again later.",
 		})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Product added to cart successfully",
+		"message": "Product added to whishlist successfully",
 	})
 }
 
-func ListAllCart(c *gin.Context) {
+func ListAllWhishList(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -137,34 +118,30 @@ func ListAllCart(c *gin.Context) {
 		return
 	}
 
-	var Carts []models.Cart
+	var whishlists []models.WhishList
 
-	if err := database.DB.Preload("Product").Where("user_id = ?", userIDUint).Find(&Carts).Error; err != nil {
+	if err := database.DB.Preload("Product").Where("user_id = ?", userIDUint).Find(&whishlists).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "failed to retrieve cart information",
+			"message": "failed to retrieve whishlist information",
 		})
 		return
 	}
 
-	if len(Carts) == 0 {
+	if len(whishlists) == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
-			"message": "Your cart is empty.",
+			"message": "Your whishlist is empty.",
 		})
 		return
 	}
-
-	var CartResponse []models.CartResponse
-	var TotalAmount float64
+	var whishlistResponse []models.CartResponse
 	ItemCount := 0
 
-	for _, cart := range Carts {
-		TotalAmount += cart.Product.Price
+	for _, whishlist := range whishlists {
 		ItemCount++
-
 		var seller models.Seller
-		if err := database.DB.Where("id = ?", cart.Product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
+		if err := database.DB.Where("id = ?", whishlist.Product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
 				"message": "failed to retrieve seller rating",
@@ -172,33 +149,30 @@ func ListAllCart(c *gin.Context) {
 			return
 		}
 
-		CartResponse = append(CartResponse, models.CartResponse{
-			ProductID:    cart.ProductID,
-			ProductName:  cart.Product.Name,
-			CategoryID:   cart.Product.CategoryID,
-			Description:  cart.Product.Description,
-			Price:        cart.Product.Price,
-			Availability: cart.Product.Availability,
-			Image:        cart.Product.Image,
+		whishlistResponse = append(whishlistResponse, models.CartResponse{
+			ProductID:    whishlist.ProductID,
+			ProductName:  whishlist.Product.Name,
+			CategoryID:   whishlist.Product.CategoryID,
+			Description:  whishlist.Product.Description,
+			Price:        whishlist.Product.Price,
+			Availability: whishlist.Product.Availability,
+			Image:        whishlist.Product.Image,
 			SellerRating: seller.AverageRating,
-			ID:           cart.ID,
+			ID:           whishlist.ID,
 		})
 	}
 
-	formattedTotalAmount := fmt.Sprintf("%.2f", TotalAmount)
-
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully get all the cart items",
+		"message": "successfully get all the whishlist items",
 		"data": gin.H{
-			"cart":        CartResponse,
-			"totalAmount": formattedTotalAmount,
-			"itemCount":   ItemCount,
+			"whishList": whishlistResponse,
+			"itemCount": ItemCount,
 		},
 	})
 }
 
-func RemoveItemFromCart(c *gin.Context) {
+func RemoveItemFromwhishlist(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -216,45 +190,44 @@ func RemoveItemFromCart(c *gin.Context) {
 		})
 		return
 	}
-
-	cartIDStr := c.Query("cartid")
-	cartID, err := strconv.Atoi(cartIDStr)
+	whishListIDStr := c.Query("whishlistid")
+	whishListID, err := strconv.Atoi(whishListIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
-			"message": "invalid cartID",
+			"message": "invalid whishlistID",
 		})
 		return
 	}
 
-	var cart models.Cart
+	var whishlist models.WhishList
 
-	if err := database.DB.First(&cart, cartID).Error; err != nil {
+	if err := database.DB.First(&whishlist, whishListID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "product is not present in the cart",
+			"message": "product is not present in the whishlist",
 		})
 		return
 	}
 
-	if cart.UserID != userIDStr {
+	if whishlist.UserID != userIDStr {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "You are not authorized to remove this item from the cart.",
+			"message": "You are not authorized to remove this item from the whishlist.",
 		})
 		return
 	}
 
-	if err := database.DB.Delete(&cart, cartID).Error; err != nil {
+	if err := database.DB.Delete(&whishlist, whishListID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "unable to remove product from the cart",
+			"message": "unable to remove product from the whishlist",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully remove product from cart",
+		"message": "successfully remove product from whishlist",
 	})
 }

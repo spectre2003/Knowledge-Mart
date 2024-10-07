@@ -9,4 +9,10 @@ const (
 
 	PaymentStatusPaid     = "Paid"
 	PaymentStatusCanceled = "Canceled"
+
+	OnlinePaymentPending   = "Pending"
+	OnlinePaymentConfirmed = "Confirmed"
+	OnlinePaymentFailed    = "Failed"
+
+	Razorpay = "Razorpay"
 )
