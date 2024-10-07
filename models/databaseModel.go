@@ -116,6 +116,7 @@ type OrderItem struct {
 	SellerID    uint    `gorm:"not null" json:"sellerId"`
 	Seller      Seller  `gorm:"foreignKey:SellerID"`
 	Price       float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	Status      string  `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
 type SellerRating struct {

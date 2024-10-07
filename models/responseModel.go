@@ -135,4 +135,5 @@ type OrderItemResponse struct {
 	Description string         `json:"description"`
 	Price       float64        `json:"price"`
 	SellerName  string         `json:"sellerName"`
+	OrderStatus string         `json:"orderStatus"`
 }

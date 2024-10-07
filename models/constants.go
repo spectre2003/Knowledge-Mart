@@ -8,5 +8,5 @@ const (
 	OrderStatusCanceled       = "canceled"
 
 	PaymentStatusPaid     = "Paid"
-	PaymetnStatusCanceled = "Canceled"
+	PaymentStatusCanceled = "Canceled"
 )

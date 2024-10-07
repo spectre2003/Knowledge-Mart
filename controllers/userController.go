@@ -9,7 +9,6 @@ import (
 )
 
 func ListAllUsers(c *gin.Context) {
-	// Check if admin is authorized
 	adminID, exists := c.Get("adminID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -28,7 +27,6 @@ func ListAllUsers(c *gin.Context) {
 		return
 	}
 
-	// Fetch all users from the database
 	var userResponse []models.UserResponse
 	var users []models.User
 
@@ -40,8 +38,6 @@ func ListAllUsers(c *gin.Context) {
 		})
 		return
 	}
-
-	// Prepare the response by iterating over the fetched users
 	for _, user := range users {
 		userResponse = append(userResponse, models.UserResponse{
 			ID:          user.ID,
