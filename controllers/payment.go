@@ -9,114 +9,116 @@ import (
 	"knowledgeMart/models"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/razorpay/razorpay-go"
 )
 
-var razorpayClient *razorpay.Client
-
-func init() {
-	keyID := os.Getenv("RAZORPAY_KEY_ID")
-	secretID := os.Getenv("RAZORPAY_KEY_SECRET")
-	razorpayClient = razorpay.NewClient(keyID, secretID)
+func RenderRazorpay(c *gin.Context) {
+	c.HTML(http.StatusOK, "payment.html", nil)
 }
 
 func CreateOrder(c *gin.Context) {
-	var initiatePayment models.InitiatePayment
-	if err := c.ShouldBindJSON(&initiatePayment); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order details"})
+	client := razorpay.NewClient(os.Getenv("RAZORPAY_KEY_ID"), os.Getenv("RAZORPAY_KEY_SECRET"))
+
+	var order models.Order
+	// Fetch the order from the database; consider handling the error.
+	if err := database.DB.Model(&models.Order{}).Where("order_id=?", 8).First(&order).Error; err != nil {
+		fmt.Println("Error fetching order:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching order"})
 		return
 	}
 
-	// Calculate the amount in paisa (assuming you have final amount logic)
-	orderAmount := initiatePayment.Amount * 100
+	// Convert TotalAmount to an integer in paise
+	amount := int(order.TotalAmount * 100) // Explicitly convert to int64
 
-	orderData := map[string]interface{}{
-		"amount":          orderAmount, // Amount in paise
-		"currency":        "INR",
-		"receipt":         initiatePayment.OrderID,
-		"payment_capture": 1, // Automatic capture
-	}
+	// Create the Razorpay order
+	razorpayOrder, err := client.Order.Create(map[string]interface{}{
+		"amount":   amount,
+		"currency": "INR",
+		"receipt":  "order_rcptid_11",
+	}, nil)
 
-	// Create Razorpay order
-	rzpOrder, err := razorpayClient.Order.Create(orderData, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		fmt.Println("Error creating Razorpay order:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating order"})
 		return
 	}
 
-	// Save Razorpay order details in DB
-	RazorpayOrderID := rzpOrder["id"].(string)
-	payment := models.Payment{
-		OrderID:         initiatePayment.OrderID,
-		RazorpayOrderID: RazorpayOrderID,
-		PaymentGateway:  models.Razorpay,
-		PaymentStatus:   models.OnlinePaymentPending,
-	}
-
-	if err := database.DB.Create(&payment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save payment details"})
-		return
-	}
-
-	// Send the order response back to the frontend
-	responseData := map[string]interface{}{
-		"razorpay_order_id": RazorpayOrderID,
-		"amount":            orderAmount,
-		"currency":          "INR",
-		"key":               os.Getenv("RAZORPAY_KEY_ID"),
-	}
-	c.JSON(http.StatusOK, responseData)
+	c.JSON(http.StatusOK, gin.H{
+		"order_id": razorpayOrder["id"],
+		"amount":   amount,
+		"currency": "INR",
+	})
+	fmt.Println(razorpayOrder)
 }
 
-func verifyPayment(c *gin.Context) {
-	// Define the payload structure to receive from Razorpay
-	var payload struct {
-		RazorpayPaymentID string `json:"razorpay_payment_id"`
-		RazorpayOrderID   string `json:"razorpay_order_id"`
-		RazorpaySignature string `json:"razorpay_signature"`
+func VerifyPayment(c *gin.Context) {
+	// Capture the Razorpay Payment ID and other details from the frontend
+	orderid := strconv.Itoa(o_id)
+	fmt.Println(orderid)
+
+	var paymentInfo struct {
+		PaymentID string `json:"razorpay_payment_id"`
+		OrderID   string `json:"razorpay_order_id"`
+		Signature string `json:"razorpay_signature"`
 	}
 
-	// Bind the incoming JSON payload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input data"})
+	if err := c.BindJSON(&paymentInfo); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment information"})
 		return
 	}
 
-	// Concatenate orderID and paymentID to create the data to verify
-	data := fmt.Sprintf("%s|%s", payload.RazorpayOrderID, payload.RazorpayPaymentID)
+	fmt.Println(paymentInfo)
 
-	// Retrieve the Razorpay secret key from environment variables
+	// Get the Razorpay secret key from environment variables
 	secret := os.Getenv("RAZORPAY_KEY_SECRET")
 
-	// Create HMAC-SHA256 hash for signature verification
+	// Verify payment signature using HMAC-SHA256
+	if !verifySignature(paymentInfo.OrderID, paymentInfo.PaymentID, paymentInfo.Signature, secret) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment signature"})
+		return
+	}
+
+	// Save payment details to the database
+	payment := models.Payment{
+		OrderID:           orderid,
+		WalletPaymentID:   "",
+		RazorpayOrderID:   paymentInfo.OrderID,
+		RazorpayPaymentID: paymentInfo.PaymentID,
+		RazorpaySignature: paymentInfo.Signature,
+		PaymentGateway:    "Razorpay",
+		PaymentStatus:     "PAID",
+	}
+	fmt.Println(payment)
+
+	// Save payment to the database
+	database.DB.Model(&models.Payment{}).Create(&payment)
+
+	// Update the order's payment status
+	database.DB.Model(&models.Order{}).Where("order_id=?", orderid).Update("payment_status", payment.PaymentStatus)
+
+	// Reset order ID
+	o_id = 0
+
+	// Payment verified successfully
+	c.JSON(http.StatusOK, gin.H{"status": "Payment verified successfully"})
+}
+
+func verifySignature(orderID, paymentID, signature, secret string) bool {
+	// Concatenate the Razorpay Order ID and Payment ID
+	data := orderID + "|" + paymentID
+
+	// Create a new HMAC by defining the hash type and the secret key
 	h := hmac.New(sha256.New, []byte(secret))
+
+	// Write the data to the HMAC
 	h.Write([]byte(data))
+
+	// Get the computed HMAC in hex format
 	expectedSignature := hex.EncodeToString(h.Sum(nil))
 
-	// Compare the expected signature with the Razorpay signature received
-	if payload.RazorpaySignature != expectedSignature {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Signature verification failed"})
-		return
-	}
-
-	// Signature verification succeeded, update the payment status in the database
-	if err := database.DB.Model(&models.Payment{}).
-		Where("razorpay_order_id = ?", payload.RazorpayOrderID).
-		Update("payment_status", models.OnlinePaymentConfirmed).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
-		return
-	}
-
-	// Update the order status in the database
-	if err := database.DB.Model(&models.Order{}).
-		Where("order_id = ?", payload.RazorpayOrderID).
-		Update("order_status", models.PaymentStatusPaid).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
-		return
-	}
-
-	// Return success response
-	c.JSON(http.StatusOK, gin.H{"status": "Payment successful"})
+	// Compare the computed HMAC with the provided Razorpay signature
+	return expectedSignature == signature
 }

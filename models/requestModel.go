@@ -112,6 +112,12 @@ type RatingRequest struct {
 }
 
 type InitiatePayment struct {
-	OrderID string  `json:"order_id" binding:"required"`
-	Amount  float64 `json:"amount" binding:"required"`
+	OrderID        uint   `json:"order_id"`
+	PaymentGateway string `json:"payment_gateway"`
+}
+
+type RazorpayPayment struct {
+	OrderID   uint   `json:"order_id"`
+	PaymentID string `json:"payment_id"`
+	Signature string `json:"signature"`
 }

@@ -2,6 +2,7 @@ package models
 
 const (
 	OrderStatusPending        = "pending"
+	OrderStatusConfirmed      = "conformed"
 	OrderStatusShipped        = "shipped"
 	OrderStatusOutForDelivery = "outForDelivery"
 	OrderStatusDelivered      = "delivered"
@@ -14,5 +15,10 @@ const (
 	OnlinePaymentConfirmed = "Confirmed"
 	OnlinePaymentFailed    = "Failed"
 
-	Razorpay = "Razorpay"
+	Razorpay = "RAZORPAY"
+	Wallet   = "WALLET"
+
+	CODStatusPending   = "COD_PENDING"
+	CODStatusConfirmed = "COD_CONFIRMED"
+	CODStatusFailed    = "COD_FAILED"
 )

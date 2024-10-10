@@ -34,6 +34,7 @@ func ConnectDB() {
 		&models.SellerRating{},
 		&models.Order{},
 		&models.WhishList{},
+		&models.Payment{},
 	)
 	if err != nil {
 		fmt.Println("Migration failed:", err)

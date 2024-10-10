@@ -9,6 +9,8 @@ import (
 
 func RegisterRoutes(router *gin.Engine) {
 
+	router.LoadHTMLGlob("templates/*")
+
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "server status ok",
@@ -80,7 +82,17 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.POST("/add_to_whishlist", controllers.AddToWhishList)
 		userRoutes.GET("/whishlist_view", controllers.ListAllWhishList)
 		userRoutes.DELETE("/remove_whishlist", controllers.RemoveItemFromwhishlist)
+
+		//payment
+
+		// userRoutes.GET("/payment_method", controllers.RenderRazorpay)
+		// userRoutes.POST("/create-order", controllers.CreateOrder)
+		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
+
 	}
+	router.POST("/verify-payment", controllers.VerifyPayment)
+	router.GET("/payment_method", controllers.RenderRazorpay)
+	router.POST("/create-order", controllers.CreateOrder)
 
 	sellerRoutes := router.Group("/seller")
 	sellerRoutes.Use(middleware.AuthRequired)

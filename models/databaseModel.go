@@ -88,6 +88,7 @@ type Order struct {
 	OrderID         uint            `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID          uint            `gorm:"not null" json:"userId"`
 	TotalAmount     float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	FinalAmount     float64         `validate:"required,number" json:"final_amount"`
 	PaymentMethod   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
 	PaymentStatus   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
 	OrderedAt       time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
@@ -136,10 +137,11 @@ type WhishList struct {
 
 type Payment struct {
 	ID                uint   `gorm:"primaryKey"`
-	OrderID           string `gorm:"not null"`           // Link to your Order table
-	RazorpayOrderID   string `gorm:"not null"`           // Razorpay's order ID
-	RazorpayPaymentID string `gorm:"default:null"`       // Razorpay payment ID after payment completion
-	RazorpaySignature string `gorm:"default:null"`       // Signature for verification
-	PaymentGateway    string `gorm:"default:'Razorpay'"` // Could be Razorpay or another payment gateway
-	PaymentStatus     string `gorm:"not null"`           // E.g., Pending, Confirmed
+	OrderID           string `gorm:"not null"`
+	WalletPaymentID   string `json:"wallet_payment_id" gorm:"column:wallet_payment_id"`
+	RazorpayOrderID   string `gorm:"not null"`
+	RazorpayPaymentID string `gorm:"default:null"`
+	RazorpaySignature string `gorm:"default:null"`
+	PaymentGateway    string `gorm:"default:'Razorpay'"`
+	PaymentStatus     string `gorm:"not null"`
 }

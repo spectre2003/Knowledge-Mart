@@ -248,7 +248,6 @@ func EmailSignup(c *gin.Context) {
 			"email":        User.Email,
 			"phone_number": User.PhoneNumber,
 			"picture":      User.Picture,
-			//"address":      User.Address,
 			"block_status": User.Blocked,
 			"verified":     User.IsVerified,
 		},
@@ -295,13 +294,6 @@ func EmailLogin(c *gin.Context) {
 		return
 	}
 
-	// if User.Password != LoginRequest.Password {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{
-	// 		"status":  false,
-	// 		"message": "Incorrect password",
-	// 	})
-	// 	return
-	// }
 	if User.Blocked {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
@@ -331,7 +323,6 @@ func EmailLogin(c *gin.Context) {
 			"email":        User.Email,
 			"phone_number": User.PhoneNumber,
 			"picture":      User.Picture,
-			//"address":      User.Address,
 			"block_status": User.Blocked,
 			"verified":     User.IsVerified,
 		},

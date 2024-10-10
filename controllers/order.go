@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var o_id int
+
 func PlaceOrder(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -126,6 +128,8 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	o_id = int(order.OrderID)
+
 	if !CartToOrderItems(userIDStr, order) {
 		database.DB.Delete(&order)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -192,6 +196,63 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 
 }
 
+// func InitiatePayment(c *gin.Context) {
+// 	var initiatePayment models.InitiatePayment
+// 	if err := c.BindJSON(&initiatePayment); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{
+// 			"status":  "failed",
+// 			"message": "Failed to bind the JSON",
+// 		})
+// 		return
+// 	}
+
+// 	// Check if payment status is confirmed
+// 	var orders []models.Order
+// 	if err := database.DB.Where("order_id = ?", initiatePayment.OrderID).Find(&orders).Error; err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"status":  "failed",
+// 			"message": "Failed to get payment information",
+// 		})
+// 		return
+// 	}
+
+// 	for _, v := range orders {
+// 		if v.PaymentStatus == string(models.OnlinePaymentConfirmed) {
+// 			c.JSON(http.StatusAlreadyReported, gin.H{
+// 				"status":  "success",
+// 				"message": "Payment already done",
+// 			})
+// 			return
+// 		}
+// 		if v.PaymentStatus == string(models.CODStatusPending) || v.PaymentStatus == string(models.CODStatusConfirmed) {
+// 			c.JSON(http.StatusAlreadyReported, gin.H{
+// 				"status":  "success",
+// 				"message": "Customer chose payment via COD",
+// 			})
+// 			return
+// 		}
+// 	}
+
+// 	// Fetch order details
+// 	var order models.Order
+// 	if err := database.DB.Where("order_id = ?", initiatePayment.OrderID).First(&order).Error; err != nil {
+// 		PaymentFailedOrderTable(initiatePayment.OrderID) // Handle payment failure logic
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"status":  "failed",
+// 			"message": "Failed to fetch order information",
+// 		})
+// 		return
+// 	}
+
+//		switch initiatePayment.PaymentGateway {
+//		case models.Razorpay:
+//			HandleRazorpay(c, initiatePayment, order)
+//		// case models.Wallet:
+//		//     HandleWalletPayment(initiatePayment.OrderID, order.UserID, c)
+//		default:
+//			HandleRazorpay(c, initiatePayment, order) // Fallback to Razorpay
+//		}
+//	}
 func GetUserOrders(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
@@ -241,7 +302,7 @@ func GetUserOrders(c *gin.Context) {
 					ProductName: product.Name,
 					Description: product.Description,
 					Image:       product.Image,
-					Price:       item.Price,
+					Price:       product.Price,
 					OrderItemID: item.OrderItemID,
 				})
 			}
@@ -461,65 +522,6 @@ func UserCheckOrderStatus(c *gin.Context) {
 		"data":   userOrderResponses,
 	})
 }
-
-// func UserCheckOrderItemStatus(c *gin.Context) {
-// 	userID, exists := c.Get("userID")
-// 	if !exists {
-// 		c.JSON(http.StatusUnauthorized, gin.H{
-// 			"status":  "failed",
-// 			"message": "user not authorized",
-// 		})
-// 		return
-// 	}
-
-// 	_, ok := userID.(uint)
-// 	if !ok {
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"status":  "failed",
-// 			"message": "failed to retrieve user information",
-// 		})
-// 		return
-// 	}
-
-// 	orderId := c.Query("orderid")
-
-// 	if orderId == "" {
-// 		c.JSON(http.StatusBadRequest, gin.H{
-// 			"status":  "failed",
-// 			"message": "orderId is required",
-// 		})
-// 		return
-// 	}
-
-// 	var orderItem []models.OrderItem
-
-// 	if err := database.DB.Preload("Product").Where("order_id = ?", orderId).Find(&orderItem).Error; err != nil {
-// 		c.JSON(http.StatusNotFound, gin.H{
-// 			"status":  "failed",
-// 			"message": "no orderitem found for this user",
-// 		})
-// 		return
-// 	}
-
-// 	var orderItemResponse []models.OrderItemResponse
-
-// 	for _, order := range orderItem {
-// 		orderItemResponse = append(orderItemResponse, models.OrderItemResponse{
-// 			OrderItemID: order.OrderItemID,
-// 			ProductName: order.Product.Name,
-// 			CategoryID:  order.Product.CategoryID,
-// 			Description: order.Product.Description,
-// 			Price:       order.Price,
-// 			Image:       order.Product.Image,
-// 			SellerName:  order.Seller.UserName,
-// 		})
-// 	}
-
-// 	c.JSON(http.StatusOK, gin.H{
-// 		"status": "success",
-// 		"data":   orderItemResponse,
-// 	})
-// }
 
 func CancelOrder(c *gin.Context) {
 	sellerID, isSeller := c.Get("sellerID")

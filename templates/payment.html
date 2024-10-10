@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Page</title>
+</head>
+<body>
+    <form id="paymentForm">
+        <button type="button" onclick="makePayment()">Pay Now</button>
+    </form>
+    
+    <script>
+        function makePayment() {
+            //const token = localStorage.getItem('authToken');
+            fetch('http://localhost:8080/create-order', {
+                method: 'POST',
+                // headers: {
+                //     'Authorization': `Bearer ${token}`
+                // }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var options = {
+                    "key": "rzp_test_NgYSGyXz1Y5e5c",  // Enter the Key ID from Razorpay Dashboard
+                    "amount": data.amount,  // Amount is in paise
+                    "currency": data.currency,
+                    "name": "G-Fresh",
+                    "description": "Razorpay",
+                    "order_id": data.order_id,  // Order ID from the API response
+                    "handler": function (response) {
+                        // Verify payment
+                        fetch('http://localhost:8080/verify-payment', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: data.order_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.status);
+                        })
+                        .catch(error => console.error('Error verifying payment:', error));
+                    },
+                    "prefill": {
+                        "name": "G-fresh",
+                        "email": "gfreshproject2024@gmail.com",
+                        "contact": "9947686494"
+                    }
+                };
+    
+                var rzp1 = new Razorpay(options);
+                rzp1.open();
+            })
+            .catch(error => console.error('Error creating order:', error));
+        }
+    </script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</body>
+</html>
