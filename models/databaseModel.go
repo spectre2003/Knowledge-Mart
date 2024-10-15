@@ -145,3 +145,6 @@ type Payment struct {
 	PaymentGateway    string `gorm:"default:'Razorpay'"`
 	PaymentStatus     string `gorm:"not null"`
 }
+
+type UserWalletHistory struct {
+}

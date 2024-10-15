@@ -102,10 +102,32 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	MethodNoStr := c.Query("methodno")
+	MethodNo, err := strconv.Atoi(MethodNoStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "invalid product ID",
+		})
+		return
+	}
+	var PaymentMethodOption string
+	switch MethodNo {
+	case 1:
+		//razorpay
+		PaymentMethodOption = models.Razorpay
+	case 2:
+		//wallet
+		PaymentMethodOption = models.Wallet
+	case 3:
+		//COD
+		PaymentMethodOption = models.COD
+	}
+
 	order := models.Order{
 		UserID:        userIDStr,
 		TotalAmount:   TotalAmount,
-		PaymentMethod: "COD",
+		PaymentMethod: PaymentMethodOption,
 		PaymentStatus: models.OrderStatusPending,
 		OrderedAt:     time.Now(),
 		SellerID:      sellerID,
@@ -196,63 +218,6 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 
 }
 
-// func InitiatePayment(c *gin.Context) {
-// 	var initiatePayment models.InitiatePayment
-// 	if err := c.BindJSON(&initiatePayment); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{
-// 			"status":  "failed",
-// 			"message": "Failed to bind the JSON",
-// 		})
-// 		return
-// 	}
-
-// 	// Check if payment status is confirmed
-// 	var orders []models.Order
-// 	if err := database.DB.Where("order_id = ?", initiatePayment.OrderID).Find(&orders).Error; err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"status":  "failed",
-// 			"message": "Failed to get payment information",
-// 		})
-// 		return
-// 	}
-
-// 	for _, v := range orders {
-// 		if v.PaymentStatus == string(models.OnlinePaymentConfirmed) {
-// 			c.JSON(http.StatusAlreadyReported, gin.H{
-// 				"status":  "success",
-// 				"message": "Payment already done",
-// 			})
-// 			return
-// 		}
-// 		if v.PaymentStatus == string(models.CODStatusPending) || v.PaymentStatus == string(models.CODStatusConfirmed) {
-// 			c.JSON(http.StatusAlreadyReported, gin.H{
-// 				"status":  "success",
-// 				"message": "Customer chose payment via COD",
-// 			})
-// 			return
-// 		}
-// 	}
-
-// 	// Fetch order details
-// 	var order models.Order
-// 	if err := database.DB.Where("order_id = ?", initiatePayment.OrderID).First(&order).Error; err != nil {
-// 		PaymentFailedOrderTable(initiatePayment.OrderID) // Handle payment failure logic
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"status":  "failed",
-// 			"message": "Failed to fetch order information",
-// 		})
-// 		return
-// 	}
-
-//		switch initiatePayment.PaymentGateway {
-//		case models.Razorpay:
-//			HandleRazorpay(c, initiatePayment, order)
-//		// case models.Wallet:
-//		//     HandleWalletPayment(initiatePayment.OrderID, order.UserID, c)
-//		default:
-//			HandleRazorpay(c, initiatePayment, order) // Fallback to Razorpay
-//		}
-//	}
 func GetUserOrders(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {

@@ -24,9 +24,17 @@ func CreateOrder(c *gin.Context) {
 
 	var order models.Order
 	// Fetch the order from the database; consider handling the error.
-	if err := database.DB.Model(&models.Order{}).Where("order_id=?", 8).First(&order).Error; err != nil {
+	if err := database.DB.Model(&models.Order{}).Where("order_id=?", o_id).First(&order).Error; err != nil {
 		fmt.Println("Error fetching order:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching order"})
+		return
+	}
+
+	if order.PaymentMethod != models.Razorpay {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "you chose another payment method",
+		})
 		return
 	}
 

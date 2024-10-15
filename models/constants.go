@@ -7,6 +7,7 @@ const (
 	OrderStatusOutForDelivery = "outForDelivery"
 	OrderStatusDelivered      = "delivered"
 	OrderStatusCanceled       = "canceled"
+	OrderStatusReturned       = "return"
 
 	PaymentStatusPaid     = "Paid"
 	PaymentStatusCanceled = "Canceled"
@@ -17,6 +18,7 @@ const (
 
 	Razorpay = "RAZORPAY"
 	Wallet   = "WALLET"
+	COD      = "COD"
 
 	CODStatusPending   = "COD_PENDING"
 	CODStatusConfirmed = "COD_CONFIRMED"
