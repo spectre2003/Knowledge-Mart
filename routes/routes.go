@@ -88,7 +88,7 @@ func RegisterRoutes(router *gin.Engine) {
 		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
 
 	}
-	//payment
+	//razorpay
 	router.POST("/verify-payment", controllers.VerifyPayment)
 	router.GET("/payment_method", controllers.RenderRazorpay)
 	router.POST("/create-order", controllers.CreateOrder)

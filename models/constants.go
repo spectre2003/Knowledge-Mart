@@ -11,6 +11,7 @@ const (
 
 	PaymentStatusPaid     = "Paid"
 	PaymentStatusCanceled = "Canceled"
+	PaymentStatusRefund   = "Refund"
 
 	OnlinePaymentPending   = "Pending"
 	OnlinePaymentConfirmed = "Confirmed"

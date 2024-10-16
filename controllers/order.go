@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"gorm.io/gorm"
 )
 
 //var o_id int
@@ -176,7 +174,7 @@ func PlaceOrder(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Order is successfully created",
+		"message": "Order is successfully created you chose " + order.PaymentMethod,
 		"data": gin.H{
 			"order_id":      order.OrderID,
 			"order_details": order,
@@ -603,7 +601,6 @@ func CancelOrder(c *gin.Context) {
 		condition = "user_id = ? AND order_id = ?"
 	}
 
-	// Retrieve the order
 	if err := database.DB.Where(condition, id, orderId).First(&orders).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -612,10 +609,9 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	// Transaction for handling cancellation and refund
 	tx := database.DB.Begin()
 
-	// Cancel single item logic
+	// Cancel single item
 	if itemId != "" {
 		var orderItem models.OrderItem
 		if err := tx.Where("order_id = ? AND order_item_id = ?", orderId, itemId).Preload("Product").First(&orderItem).Error; err != nil {
@@ -637,7 +633,6 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		// Update the total order amount
 		orders.TotalAmount -= orderItem.Price
 		if err := tx.Model(&orders).Update("total_amount", orders.TotalAmount).Error; err != nil {
 			tx.Rollback()
@@ -648,7 +643,6 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		// Update product availability
 		orderItem.Product.Availability = true
 		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
 			tx.Rollback()
@@ -659,7 +653,6 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		// Refund for single item cancellation
 		err := RefundToUser(tx, id, orderId, orderItem.Price, "Single item canceled")
 		if err != nil {
 			tx.Rollback()
@@ -679,7 +672,6 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	// Cancel entire order logic
 	orders.Status = models.OrderStatusCanceled
 	orders.PaymentStatus = models.PaymentStatusCanceled
 
@@ -695,7 +687,6 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	// Update all items in the order to available
 	var orderItems []models.OrderItem
 	if err := tx.Preload("Product").Where("order_id = ?", orderId).Find(&orderItems).Error; err != nil {
 		tx.Rollback()
@@ -707,8 +698,12 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	for _, orderItem := range orderItems {
+		orderItem.Status = models.OrderStatusCanceled
 		orderItem.Product.Availability = true
-		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
+		if err := tx.Model(&orderItem.Product).Updates(map[string]interface{}{
+			"availability": orderItem.Product.Availability,
+			"status":       orderItem.Status,
+		}).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
@@ -718,7 +713,6 @@ func CancelOrder(c *gin.Context) {
 		}
 	}
 
-	// Refund for entire order cancellation
 	err := RefundToUser(tx, id, orderId, orders.TotalAmount, "Entire order canceled")
 	if err != nil {
 		tx.Rollback()
@@ -737,30 +731,165 @@ func CancelOrder(c *gin.Context) {
 	})
 }
 
-// RefundToUser processes the refund by updating the user's wallet
-func RefundToUser(tx *gorm.DB, userID uint, orderID string, amount float64, reason string) error {
-	var wallet models.UserWallet
-
-	if err := tx.Where("user_id = ?", userID).First(&wallet).Error; err != nil {
-		return err
-	}
-	newBalance := wallet.CurrentBalance + amount
-
-	walletTransaction := models.UserWallet{
-		UserID:          userID,
-		WalletPaymentID: fmt.Sprintf("WALLET_%d", time.Now().Unix()), // Generate unique ID
-		Type:            "incoming",
-		OrderID:         orderID,
-		Amount:          amount,
-		CurrentBalance:  newBalance,
-		Reason:          reason,
+func ReturnOrder(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "user not authorized",
+		})
+		return
 	}
 
-	// Save the new wallet transaction and update the balance
-	if err := tx.Create(&walletTransaction).Error; err != nil {
-		return err
+	userIDStr, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve user information",
+		})
+		return
 	}
 
-	// Update the current wallet balance
-	return tx.Model(&wallet).Update("current_balance", newBalance).Error
+	orderId := c.Query("orderid")
+	itemId := c.Query("itemid")
+
+	if orderId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "orderId is required",
+		})
+		return
+	}
+
+	var orders models.Order
+
+	if err := database.DB.Where("user_id = ? AND order_id = ?", userIDStr, orderId).First(&orders).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "order not found for this user",
+		})
+		return
+	}
+
+	tx := database.DB.Begin()
+
+	// return single item
+	if itemId != "" {
+		var orderItem models.OrderItem
+		if err := tx.Where("order_id = ? AND order_item_id = ?", orderId, itemId).Preload("Product").First(&orderItem).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":  "failed",
+				"message": "order item not found",
+			})
+			return
+		}
+
+		orderItem.Status = models.OrderStatusReturned
+		if err := tx.Model(&orderItem).Update("status", orderItem.Status).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to return order item",
+			})
+			return
+		}
+
+		// orders.TotalAmount -= orderItem.Price
+		// if err := tx.Model(&orders).Update("total_amount", orders.TotalAmount).Error; err != nil {
+		// 	tx.Rollback()
+		// 	c.JSON(http.StatusInternalServerError, gin.H{
+		// 		"status":  "failed",
+		// 		"message": "failed to update order total",
+		// 	})
+		// 	return
+		// }
+
+		orderItem.Product.Availability = true
+		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to update product availability",
+			})
+			return
+		}
+
+		err := RefundToUser(tx, userIDStr, orderId, orderItem.Price, "Single item returned")
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to refund amount",
+			})
+			return
+		}
+
+		tx.Commit()
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Order item returned and amount refunded",
+		})
+		return
+	}
+
+	orders.Status = models.OrderStatusReturned
+	orders.PaymentStatus = models.PaymentStatusRefund
+
+	if err := tx.Model(&orders).Updates(map[string]interface{}{
+		"status":         orders.Status,
+		"payment_status": orders.PaymentStatus,
+	}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to update order status",
+		})
+		return
+	}
+
+	var orderItems []models.OrderItem
+	if err := tx.Preload("Product").Where("order_id = ?", orderId).Find(&orderItems).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "order items not found for this order",
+		})
+		return
+	}
+
+	for _, orderItem := range orderItems {
+		orderItem.Status = models.OrderStatusReturned
+		orderItem.Product.Availability = true
+		if err := tx.Model(&orderItem.Product).Updates(map[string]interface{}{
+			"availability": orderItem.Product.Availability,
+			"status":       orderItem.Status,
+		}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to update product availability",
+			})
+			return
+		}
+	}
+
+	err := RefundToUser(tx, userIDStr, orderId, orders.TotalAmount, "Entire order canceled")
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to refund amount",
+		})
+		return
+	}
+
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Order canceled and amount refunded",
+	})
+
 }
