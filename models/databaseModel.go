@@ -16,17 +16,18 @@ type Admin struct {
 
 type User struct {
 	gorm.Model
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name        string `gorm:"type:varchar(255)" validate:"required" json:"name"`
-	Email       string `gorm:"type:varchar(255);unique" validate:"email" json:"email"`
-	PhoneNumber string `gorm:"type:varchar(255);unique" validate:"number" json:"phone_number"`
-	Picture     string `gorm:"type:text" json:"picture"`
-	Password    string `gorm:"type:varchar(255)" validate:"required" json:"password"`
-	Blocked     bool   `gorm:"type:bool" json:"blocked"`
-	OTP         uint64
-	OTPExpiry   time.Time
-	IsVerified  bool   `gorm:"type:bool" json:"verified"`
-	LoginMethod string `gorm:"type:varchar(50)" json:"login_method"`
+	ID           uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name         string  `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	Email        string  `gorm:"type:varchar(255);unique" validate:"email" json:"email"`
+	PhoneNumber  string  `gorm:"type:varchar(255);unique" validate:"number" json:"phone_number"`
+	Picture      string  `gorm:"type:text" json:"picture"`
+	WalletAmount float64 `gorm:"column:wallet_amount;type:double precision" json:"wallet_amount"`
+	Password     string  `gorm:"type:varchar(255)" validate:"required" json:"password"`
+	Blocked      bool    `gorm:"type:bool" json:"blocked"`
+	OTP          uint64
+	OTPExpiry    time.Time
+	IsVerified   bool   `gorm:"type:bool" json:"verified"`
+	LoginMethod  string `gorm:"type:varchar(50)" json:"login_method"`
 }
 
 type Seller struct {
@@ -35,6 +36,7 @@ type Seller struct {
 	UserID        uint    `gorm:"not null;constraint:OnDelete:CASCADE;" json:"userId"`
 	User          User    `gorm:"foreignKey:UserID"`
 	UserName      string  `gorm:"type:varchar(255)" validate:"required" json:"name"`
+	WalletAmount  float64 `gorm:"column:wallet_amount;type:double precision" json:"wallet_amount"`
 	Password      string  `gorm:"type:varchar(255)" validate:"required" json:"password"`
 	Description   string  `gorm:"type:varchar(255)" validate:"required" json:"description"`
 	IsVerified    bool    `gorm:"type:bool" json:"verified"`
@@ -146,5 +148,23 @@ type Payment struct {
 	PaymentStatus     string `gorm:"not null"`
 }
 
-type UserWalletHistory struct {
+type UserWallet struct {
+	TransactionTime time.Time `gorm:"autoCreateTime" json:"transaction_time"`
+	WalletPaymentID string    `gorm:"column:wallet_payment_id" json:"wallet_payment_id"`
+	UserID          uint      `gorm:"column:user_id" json:"user_id"`
+	Type            string    `gorm:"column:type" json:"type"` //incoming //outgoing
+	OrderID         string    `gorm:"column:order_id" json:"order_id"`
+	Amount          float64   `gorm:"column:amount" json:"amount"`
+	CurrentBalance  float64   `gorm:"column:current_balance" json:"current_balance"`
+	Reason          string    `gorm:"column:reason" json:"reason"`
+}
+
+type SellerWallet struct {
+	TransactionTime time.Time `gorm:"autoCreateTime" json:"transaction_time"`
+	Type            string    `gorm:"column:type" json:"type"` //incoming //outgoing
+	OrderID         uint      `gorm:"column:order_id" json:"order_id"`
+	SellerID        uint      `gorm:"column:restaurant_id" json:"restaurant_id"`
+	Amount          float64   `gorm:"column:amount" json:"amount"`
+	CurrentBalance  float64   `gorm:"column:current_balance" json:"current_balance"`
+	Reason          string    `gorm:"column:reason" json:"reason"`
 }

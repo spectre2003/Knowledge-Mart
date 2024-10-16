@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 )
 
@@ -125,6 +126,7 @@ type UserOrderResponse struct {
 	Status          string              `json:"orderStatus"`
 	PaymentStatus   string              `json:"paymentStatus"`
 	Items           []OrderItemResponse `json:"items"`
+	ItemCounts      gin.H               `json:"item_counts"`
 }
 
 type OrderItemResponse struct {

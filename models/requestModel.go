@@ -111,9 +111,15 @@ type RatingRequest struct {
 	Rating   float64 `json:"rating" binding:"required,min=1,max=5"`
 }
 
-type InitiatePayment struct {
-	OrderID        uint   `json:"order_id"`
-	PaymentGateway string `json:"payment_gateway"`
+// type InitiatePayment struct {
+// 	OrderID        uint   `json:"order_id"`
+// 	PaymentGateway string `json:"payment_gateway"`
+// }
+
+type PlaceOrder struct {
+	AddressID     uint   `validate:"required,number" json:"address_id"`
+	PaymentMethod uint   `validate:"required" json:"payment_method"`
+	CouponCode    string `json:"coupon_code"`
 }
 
 type RazorpayPayment struct {

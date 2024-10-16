@@ -83,13 +83,12 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/whishlist_view", controllers.ListAllWhishList)
 		userRoutes.DELETE("/remove_whishlist", controllers.RemoveItemFromwhishlist)
 
-		//payment
-
 		// userRoutes.GET("/payment_method", controllers.RenderRazorpay)
 		// userRoutes.POST("/create-order", controllers.CreateOrder)
 		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
 
 	}
+	//payment
 	router.POST("/verify-payment", controllers.VerifyPayment)
 	router.GET("/payment_method", controllers.RenderRazorpay)
 	router.POST("/create-order", controllers.CreateOrder)
