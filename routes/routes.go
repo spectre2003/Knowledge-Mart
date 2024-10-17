@@ -71,6 +71,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.POST("/order_place", controllers.PlaceOrder)
 		userRoutes.GET("/my_orders", controllers.UserCheckOrderStatus)
 		userRoutes.PATCH("/order_cancel", controllers.CancelOrder)
+		userRoutes.PATCH("/order_return", controllers.ReturnOrder)
 
 		//note sharing
 		userRoutes.POST("/file_upload", controllers.UploadFile)
@@ -87,11 +88,13 @@ func RegisterRoutes(router *gin.Engine) {
 		// userRoutes.POST("/create-order", controllers.CreateOrder)
 		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
 
+		//wallet
+		//userRoutes.POST("/wallet_payment", controllers.WalletPayment)
 	}
 	//razorpay
-	router.POST("/verify-payment", controllers.VerifyPayment)
+	router.POST("/verify-payment/:orderID", controllers.VerifyPayment)
 	router.GET("/payment_method", controllers.RenderRazorpay)
-	router.POST("/create-order", controllers.CreateOrder)
+	router.POST("/create-order/:orderID", controllers.CreateOrder)
 
 	sellerRoutes := router.Group("/seller")
 	sellerRoutes.Use(middleware.AuthRequired)

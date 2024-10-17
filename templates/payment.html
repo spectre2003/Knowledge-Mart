@@ -24,11 +24,11 @@ function makePayment() {
             "key": "rzp_test_NgYSGyXz1Y5e5c",  // Enter the Key ID from Razorpay Dashboard
             "amount": data.amount,  // Amount is in paise
             "currency": data.currency,
-            "name": "G-Fresh",
+            "name": "Knowledge-Mart",
             "description": "Razorpay",
             "order_id": data.order_id,  // Order ID from the API response
             "handler": function (response) {
-                fetch('http://localhost:8080/verify-payment', {
+                fetch(`http://localhost:8080/verify-payment/${orderID}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -46,9 +46,9 @@ function makePayment() {
                 .catch(error => console.error('Error verifying payment:', error));
             },
             "prefill": {
-                "name": "G-fresh",
-                "email": "gfreshproject2024@gmail.com",
-                "contact": "9947686494"
+                "name": "Knowledge-Mart",
+                "email": "knowledgemartv01@gmail.com",
+                "contact": "6282242522"
             }
         };
 
