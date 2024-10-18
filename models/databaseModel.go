@@ -87,16 +87,18 @@ type Cart struct {
 }
 
 type Order struct {
-	OrderID         uint            `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID          uint            `gorm:"not null" json:"userId"`
-	TotalAmount     float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
-	FinalAmount     float64         `validate:"required,number" json:"final_amount"`
-	PaymentMethod   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
-	PaymentStatus   string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
-	OrderedAt       time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
-	ShippingAddress ShippingAddress `gorm:"embedded" json:"shippingAddress"`
-	SellerID        uint            `gorm:"not null" json:"sellerId"`
-	Status          string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
+	OrderID              uint            `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID               uint            `gorm:"not null" json:"userId"`
+	CouponCode           string          `json:"coupon_code"`
+	CouponDiscountAmount float64         `validate:"required,number" json:"coupon_discount_amount"`
+	TotalAmount          float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	FinalAmount          float64         `validate:"required,number" json:"final_amount"`
+	PaymentMethod        string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
+	PaymentStatus        string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
+	OrderedAt            time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
+	ShippingAddress      ShippingAddress `gorm:"embedded" json:"shippingAddress"`
+	SellerID             uint            `gorm:"not null" json:"sellerId"`
+	Status               string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
 type ShippingAddress struct {
@@ -146,6 +148,7 @@ type Payment struct {
 	RazorpaySignature string `gorm:"default:null"`
 	PaymentGateway    string `gorm:"default:'Razorpay'"`
 	PaymentStatus     string `gorm:"not null"`
+	AmountPaid        float64
 }
 
 type UserWallet struct {
@@ -167,4 +170,19 @@ type SellerWallet struct {
 	Amount          float64   `gorm:"column:amount" json:"amount"`
 	CurrentBalance  float64   `gorm:"column:current_balance" json:"current_balance"`
 	Reason          string    `gorm:"column:reason" json:"reason"`
+}
+
+type CouponInventory struct {
+	CouponCode    string  `validate:"required" json:"coupon_code" gorm:"primary_key"`
+	Expiry        int64   `validate:"required" json:"expiry"`
+	Percentage    uint    `validate:"required" json:"percentage"`
+	MaximumUsage  uint    `validate:"required" json:"maximum_usage"`
+	MinimumAmount float64 `validate:"required" json:"minimum_amount"`
+}
+
+type CouponUsage struct {
+	gorm.Model
+	UserID     uint   `json:"user_id"`
+	CouponCode string `json:"coupon_code"`
+	UsageCount uint   `json:"usage_count"`
 }

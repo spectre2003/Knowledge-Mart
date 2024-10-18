@@ -96,6 +96,7 @@ type GetSellerOrdersResponse struct {
 	PaymentStatus   string          `json:"paymentStatus"`
 	OrderStatus     string          `json:"orderStatus"`
 	TotalAmount     float64         `json:"totalAmount"`
+	FinalAmount     float64         `json:"finalAmount"`
 	Product         []ProductArray  `json:"products"`
 	ShippingAddress ShippingAddress `json:"shippingAddress"`
 }
@@ -121,7 +122,7 @@ type GetSellerOrderStatusResponse struct {
 type UserOrderResponse struct {
 	OrderID         uint                `json:"orderId"`
 	OrderedAt       time.Time           `json:"orderedAt"`
-	TotalAmount     float64             `json:"totalAmount"`
+	FinalAmount     float64             `json:"totalAmount"`
 	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 	Status          string              `json:"orderStatus"`
 	PaymentStatus   string              `json:"paymentStatus"`

@@ -21,14 +21,14 @@ func AddMoneyToSellerWallet(OrderID string) bool {
 		return false
 	}
 
-	Seller.WalletAmount += Order.TotalAmount
+	Seller.WalletAmount += Order.FinalAmount
 
 	sellerWallet := models.SellerWallet{
 		TransactionTime: time.Now(),
 		Type:            models.WalletIncoming,
 		OrderID:         Order.OrderID,
 		SellerID:        Order.SellerID,
-		Amount:          Order.TotalAmount,
+		Amount:          Order.FinalAmount,
 		CurrentBalance:  Seller.WalletAmount,
 		Reason:          "Order Payment",
 	}
@@ -145,14 +145,14 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 		return models.UserWallet{}, fmt.Errorf("failed to find the order for this user")
 	}
 
-	if Order.TotalAmount > User.WalletAmount {
+	if Order.FinalAmount > User.WalletAmount {
 		return models.UserWallet{}, fmt.Errorf("not enough wallet balance to pay for this order")
 	}
 
 	if Order.PaymentMethod != models.Wallet {
 		return models.UserWallet{}, fmt.Errorf("incorrect payment method")
 	}
-	newBalance := User.WalletAmount - Order.TotalAmount
+	newBalance := User.WalletAmount - Order.FinalAmount
 	if err := tx.Model(&User).Update("wallet_amount", newBalance).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to update user wallet balance")
 	}
@@ -162,7 +162,7 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 		WalletPaymentID: fmt.Sprintf("WALLET_%d", time.Now().Unix()),
 		Type:            "outgoing",
 		OrderID:         orderIDStr,
-		Amount:          Order.TotalAmount,
+		Amount:          Order.FinalAmount,
 		CurrentBalance:  newBalance,
 		Reason:          "Order payment using wallet",
 		TransactionTime: time.Now(),
@@ -177,7 +177,7 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 		return models.UserWallet{}, fmt.Errorf("failed to find the seller")
 	}
 
-	newSellerBalance := seller.WalletAmount + Order.TotalAmount
+	newSellerBalance := seller.WalletAmount + Order.FinalAmount
 	if err := tx.Model(&seller).Update("wallet_amount", newSellerBalance).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to update seller wallet balance")
 	}
@@ -187,7 +187,7 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 		Type:            "incoming",
 		OrderID:         Order.OrderID,
 		SellerID:        seller.ID,
-		Amount:          Order.TotalAmount,
+		Amount:          Order.FinalAmount,
 		CurrentBalance:  newSellerBalance,
 		Reason:          "order payment credited",
 	}

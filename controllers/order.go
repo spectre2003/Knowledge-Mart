@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
@@ -12,11 +11,12 @@ import (
 )
 
 func PlaceOrder(c *gin.Context) {
+	// Retrieve user ID from context
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "user not authorized ",
+			"message": "user not authorized",
 		})
 		return
 	}
@@ -29,8 +29,9 @@ func PlaceOrder(c *gin.Context) {
 		})
 		return
 	}
-	var request models.PlaceOrder
 
+	// Bind and validate the request JSON
+	var request models.PlaceOrder
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
@@ -48,20 +49,18 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	// Fetch the user
 	var User models.User
-
 	if err := database.DB.Where("id = ?", userIDStr).First(&User).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
-			"message": "user doesn't exist, please verify user id",
+			"message": "user doesn't exist, please verify user ID",
 		})
 		return
 	}
 
+	// Fetch cart items for the user
 	var CartItems []models.Cart
-	var TotalAmount float64
-	var sellerID uint
-
 	if err := database.DB.Preload("Product").Where("user_id = ?", userIDStr).Find(&CartItems).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -78,12 +77,15 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	// Ensure all products belong to the same seller and calculate the total amount
+	var TotalAmount float64
+	var sellerID uint
 	for _, item := range CartItems {
 		Product := item.Product
 		if !Product.Availability {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "failed",
-				"message": "items in the cart are out of stock, please update the cart to ensure all items are in stock",
+				"message": "Some items in the cart are out of stock.",
 			})
 			return
 		}
@@ -99,38 +101,66 @@ func PlaceOrder(c *gin.Context) {
 			return
 		}
 	}
-	var Address models.Address
 
+	// Apply coupon before creating order
+	var CouponDiscount float64
+	if request.CouponCode != "" {
+		success, msg, discount := ApplyCouponToOrder(TotalAmount, userIDStr, request.CouponCode)
+		if !success {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": msg,
+			})
+			return
+		}
+		CouponDiscount = discount
+	}
+
+	// Final total after applying coupon
+	finalAmount := TotalAmount - CouponDiscount
+
+	// Validate the shipping address
+	var Address models.Address
 	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, request.AddressID).First(&Address).Error; err != nil {
 		c.JSON(http.StatusConflict, gin.H{
 			"status":  "failed",
-			"message": "invalid address, please retry with user's address",
+			"message": "Invalid shipping address.",
 		})
 		return
 	}
 
-	MethodNo := request.PaymentMethod
-	var PaymentMethodOption string
-	switch MethodNo {
+	// Determine the payment method
+	PaymentMethodOption := ""
+	switch request.PaymentMethod {
 	case 1:
 		PaymentMethodOption = models.Razorpay
 	case 2:
 		PaymentMethodOption = models.Wallet
 	case 3:
 		PaymentMethodOption = models.COD
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Invalid payment method.",
+		})
+		return
 	}
 
-	// Start a transaction
+	// Start the database transaction
 	tx := database.DB.Begin()
 
+	// Create order with final amount and discount
 	order := models.Order{
-		UserID:        userIDStr,
-		TotalAmount:   TotalAmount,
-		PaymentMethod: PaymentMethodOption,
-		PaymentStatus: models.OrderStatusPending,
-		OrderedAt:     time.Now(),
-		SellerID:      sellerID,
-		Status:        models.OrderStatusPending,
+		UserID:               userIDStr,
+		TotalAmount:          TotalAmount,
+		FinalAmount:          finalAmount,
+		PaymentMethod:        PaymentMethodOption,
+		PaymentStatus:        models.OrderStatusPending,
+		OrderedAt:            time.Now(),
+		CouponCode:           request.CouponCode,
+		CouponDiscountAmount: CouponDiscount,
+		SellerID:             sellerID,
+		Status:               models.OrderStatusPending,
 		ShippingAddress: models.ShippingAddress{
 			StreetName:   Address.StreetName,
 			StreetNumber: Address.StreetNumber,
@@ -145,43 +175,29 @@ func PlaceOrder(c *gin.Context) {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "failed to create order" + err.Error(),
+			"message": "Failed to create order.",
 		})
 		return
 	}
 
-	// Call wallet payment if the wallet is chosen
-	if PaymentMethodOption == models.Wallet {
-
-		orderIDStr := fmt.Sprintf("%d", order.OrderID)
-
-		if _, err := ProcessWalletPayment(userIDStr, orderIDStr, tx); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status":  "failed",
-				"message": err.Error(),
-			})
-			return
-		}
-	}
-
+	// Transfer cart items to order with possible discount
 	if PaymentMethodOption == models.COD || PaymentMethodOption == models.Wallet {
-		if !CartToOrderItems(userIDStr, order) {
+		if !CartToOrderItems(userIDStr, order, CouponDiscount) {
 			tx.Rollback()
-			database.DB.Delete(&order)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
-				"message": "failed to transfer cart items to order",
+				"message": "Failed to transfer cart items to order.",
 			})
 			return
 		}
 	}
 
+	// Commit the transaction
 	tx.Commit()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Order is successfully created with " + order.PaymentMethod,
+		"message": "Order successfully created with " + order.PaymentMethod,
 		"data": gin.H{
 			"order_id":      order.OrderID,
 			"order_details": order,
@@ -189,9 +205,8 @@ func PlaceOrder(c *gin.Context) {
 	})
 }
 
-func CartToOrderItems(UserID uint, Order models.Order) bool {
+func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) bool {
 	var CartItems []models.Cart
-
 	if err := database.DB.Preload("Product").Where("user_id = ?", UserID).Find(&CartItems).Error; err != nil {
 		return false
 	}
@@ -200,24 +215,33 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 		return false
 	}
 
+	var totalCartPrice float64
+	for _, cartItem := range CartItems {
+		totalCartPrice += cartItem.Product.Price
+	}
+
 	// transaction starts
 	tx := database.DB.Begin()
 
 	for _, cartItem := range CartItems {
 		Product := cartItem.Product
+		proportionalDiscount := (Product.Price / totalCartPrice) * CouponDiscount
+
+		finalPrice := Product.Price - proportionalDiscount
 
 		orderItem := models.OrderItem{
 			OrderID:   Order.OrderID,
 			ProductID: cartItem.ProductID,
 			UserID:    UserID,
 			SellerID:  Product.SellerID,
-			Price:     Product.Price,
+			Price:     finalPrice,
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {
 			tx.Rollback()
 			return false
 		}
+
 		Product.Availability = false
 		if err := tx.Model(&Product).Where("id = ?", Product.ID).Update("availability", Product.Availability).Error; err != nil {
 			tx.Rollback()
@@ -225,7 +249,7 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 		}
 	}
 
-	if err := tx.Where("user_id = ? ", UserID).Delete(&CartItems).Error; err != nil {
+	if err := tx.Where("user_id = ?", UserID).Delete(&CartItems).Error; err != nil {
 		tx.Rollback()
 		return false
 	}
@@ -234,7 +258,6 @@ func CartToOrderItems(UserID uint, Order models.Order) bool {
 	tx.Commit()
 
 	return true
-
 }
 
 func GetUserOrders(c *gin.Context) {
@@ -298,6 +321,7 @@ func GetUserOrders(c *gin.Context) {
 			PaymentMethod:   order.PaymentMethod,
 			PaymentStatus:   order.PaymentStatus,
 			TotalAmount:     order.TotalAmount,
+			FinalAmount:     order.FinalAmount,
 			OrderStatus:     order.Status,
 			Product:         products,
 			ShippingAddress: order.ShippingAddress,
@@ -359,6 +383,8 @@ func SellerUpdateOrderStatus(c *gin.Context) {
 
 	switch ordersItem.Status {
 	case models.OrderStatusPending:
+		ordersItem.Status = models.OrderStatusConfirmed
+	case models.OrderStatusConfirmed:
 		ordersItem.Status = models.OrderStatusShipped
 	case models.OrderStatusShipped:
 		ordersItem.Status = models.OrderStatusOutForDelivery
@@ -548,7 +574,7 @@ func UserCheckOrderStatus(c *gin.Context) {
 		userOrderResponses = append(userOrderResponses, models.UserOrderResponse{
 			OrderID:         order.OrderID,
 			OrderedAt:       order.OrderedAt,
-			TotalAmount:     order.TotalAmount,
+			FinalAmount:     order.FinalAmount,
 			Items:           orderItemResponses,
 			Status:          order.Status,
 			PaymentStatus:   order.PaymentStatus,
@@ -698,7 +724,6 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	for _, orderItem := range orderItems {
-		// Update order item status to returned
 		orderItem.Status = models.OrderStatusCanceled
 		if err := tx.Model(&orderItem).Update("status", orderItem.Status).Error; err != nil {
 			tx.Rollback()
@@ -709,7 +734,6 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		// Update product availability
 		orderItem.Product.Availability = true
 		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
 			tx.Rollback()

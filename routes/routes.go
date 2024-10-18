@@ -46,6 +46,9 @@ func RegisterRoutes(router *gin.Engine) {
 	router.GET("/product_z_to_a", controllers.SearchProductZtoA)
 	router.GET("/product_popularity", controllers.SearchProductHighRatedFirst)
 
+	//coupon
+	router.GET("/coupon/all", controllers.GetAllCoupons)
+
 	userRoutes := router.Group("/user")
 	userRoutes.Use(middleware.AuthRequired)
 	{
@@ -66,6 +69,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.POST("/add_to_cart", controllers.AddToCart)
 		userRoutes.GET("/cart_view", controllers.ListAllCart)
 		userRoutes.DELETE("/remove_cart", controllers.RemoveItemFromCart)
+		userRoutes.GET("/coupon/cart", controllers.ApplyCouponOnCart)
 
 		//order
 		userRoutes.POST("/order_place", controllers.PlaceOrder)
@@ -134,6 +138,11 @@ func RegisterRoutes(router *gin.Engine) {
 		adminRoutes.GET("/all_seller", controllers.ListAllSellers)
 		adminRoutes.PATCH("/verify_seller", controllers.VerifySeller)
 		adminRoutes.PATCH("/not_verified_seller", controllers.NotVerifySeller)
+
+		//Coupon management
+		adminRoutes.POST("/coupon/create", controllers.CreateCoupen)
+		adminRoutes.PATCH("/coupon/update", controllers.UpdateCoupon)
+		adminRoutes.DELETE("/coupon/delete", controllers.DeleteCoupon)
 	}
 
 }

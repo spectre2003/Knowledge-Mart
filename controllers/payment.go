@@ -52,7 +52,7 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	amount := int(order.TotalAmount * 100)
+	amount := int(order.FinalAmount * 100)
 
 	razorpayOrder, err := client.Order.Create(map[string]interface{}{
 		"amount":   amount,
@@ -105,6 +105,17 @@ func VerifyPayment(c *gin.Context) {
 		return
 	}
 
+	var order models.Order
+	if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
+		fmt.Println("Failed to retrieve order:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve order"})
+		return
+	}
+
+	discount := order.CouponDiscountAmount
+
+	//finalAmount := order.TotalAmount - discount
+
 	payment := models.Payment{
 		OrderID:           orderIDStr,
 		WalletPaymentID:   "",
@@ -113,6 +124,7 @@ func VerifyPayment(c *gin.Context) {
 		RazorpaySignature: paymentInfo.Signature,
 		PaymentGateway:    models.Razorpay,
 		PaymentStatus:     models.PaymentStatusPaid,
+		//AmountPaid:        finalAmount,
 	}
 
 	if err := database.DB.Model(&models.Payment{}).Create(&payment).Error; err != nil {
@@ -141,16 +153,7 @@ func VerifyPayment(c *gin.Context) {
 
 	fmt.Println("Order payment and status updated successfully")
 
-	var order models.Order
-	if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve order",
-		})
-		return
-	}
-
-	if !CartToOrderItems(order.UserID, order) {
+	if !CartToOrderItems(order.UserID, order, discount) {
 		database.DB.Delete(&order)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
