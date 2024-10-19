@@ -114,7 +114,7 @@ func ListAllCart(c *gin.Context) {
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",
-			"message": "user not authorized ",
+			"message": "user not authorized",
 		})
 		return
 	}
@@ -128,6 +128,7 @@ func ListAllCart(c *gin.Context) {
 		return
 	}
 
+	// Retrieve user information
 	var user models.User
 	if err := database.DB.Where("id = ?", userIDUint).First(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -137,8 +138,8 @@ func ListAllCart(c *gin.Context) {
 		return
 	}
 
+	// Retrieve the user's cart items
 	var Carts []models.Cart
-
 	if err := database.DB.Preload("Product").Where("user_id = ?", userIDUint).Find(&Carts).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
@@ -160,9 +161,22 @@ func ListAllCart(c *gin.Context) {
 	ItemCount := 0
 
 	for _, cart := range Carts {
-		TotalAmount += cart.Product.OfferAmount
+		// Retrieve category offer percentage
+		var category models.Category
+		if err := database.DB.Where("id = ?", cart.Product.CategoryID).Select("offer_percentage").First(&category).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to retrieve category offer",
+			})
+			return
+		}
+
+		// Calculate final amount after applying category offer
+		finalAmount := calculateFinalAmount(cart.Product.Price, cart.Product.OfferAmount, category.OfferPercentage)
+		TotalAmount += finalAmount
 		ItemCount++
 
+		// Retrieve seller's rating
 		var seller models.Seller
 		if err := database.DB.Where("id = ?", cart.Product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -179,6 +193,7 @@ func ListAllCart(c *gin.Context) {
 			Description:  cart.Product.Description,
 			Price:        cart.Product.Price,
 			OfferAmount:  cart.Product.OfferAmount,
+			FinalAmount:  finalAmount,
 			Availability: cart.Product.Availability,
 			Image:        cart.Product.Image,
 			SellerRating: seller.AverageRating,
@@ -190,7 +205,7 @@ func ListAllCart(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully get all the cart items",
+		"message": "successfully retrieved all cart items",
 		"data": gin.H{
 			"cart":        CartResponse,
 			"totalAmount": formattedTotalAmount,

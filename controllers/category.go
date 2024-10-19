@@ -156,9 +156,10 @@ func AddCatogory(c *gin.Context) {
 	}
 
 	NewCategory := models.Category{
-		Name:        Request.Name,
-		Description: Request.Description,
-		Image:       Request.Image,
+		Name:            Request.Name,
+		Description:     Request.Description,
+		Image:           Request.Image,
+		OfferPercentage: Request.OfferPercentage,
 	}
 
 	if err := database.DB.Save(&NewCategory).Error; err != nil {
@@ -174,10 +175,11 @@ func AddCatogory(c *gin.Context) {
 		"status":  "success",
 		"message": "successully added a new category",
 		"data": gin.H{
-			"id":          NewCategory.ID,
-			"name":        NewCategory.Name,
-			"description": NewCategory.Description,
-			"image":       NewCategory.Image,
+			"id":               NewCategory.ID,
+			"name":             NewCategory.Name,
+			"description":      NewCategory.Description,
+			"image":            NewCategory.Image,
+			"offer_percentage": NewCategory.OfferPercentage,
 		},
 	})
 
@@ -229,6 +231,9 @@ func EditCategory(c *gin.Context) {
 	if Request.Image != "" {
 		existCategory.Image = Request.Image
 	}
+	if Request.OfferPercentage != 0 {
+		existCategory.OfferPercentage = Request.OfferPercentage
+	}
 
 	if err := database.DB.Model(&existCategory).Updates(existCategory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -242,10 +247,11 @@ func EditCategory(c *gin.Context) {
 		"status":  "success",
 		"message": "successfully updated category",
 		"data": gin.H{
-			"id":          existCategory.ID,
-			"name":        existCategory.Name,
-			"description": existCategory.Description,
-			"image":       existCategory.Image,
+			"id":               existCategory.ID,
+			"name":             existCategory.Name,
+			"description":      existCategory.Description,
+			"image":            existCategory.Image,
+			"offer_percentage": existCategory.OfferPercentage,
 		},
 	})
 }

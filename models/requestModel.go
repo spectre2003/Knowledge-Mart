@@ -50,16 +50,18 @@ type EditProductRequest struct {
 }
 
 type AddCategoryRequest struct {
-	Name        string `validate:"required" json:"name"`
-	Description string `validate:"required" json:"description"`
-	Image       string `validate:"required" json:"image"`
+	Name            string `validate:"required" json:"name"`
+	Description     string `validate:"required" json:"description"`
+	Image           string `validate:"required" json:"image"`
+	OfferPercentage uint   `json:"offer_percentage"`
 }
 
 type EditCategoryRequest struct {
-	ID          uint   `validate:"required,number" json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Image       string `json:"image"`
+	ID              uint   `validate:"required,number" json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Image           string `json:"image"`
+	OfferPercentage uint   `json:"offer_percentage"`
 }
 
 type AddAddresRequest struct {
@@ -132,4 +134,9 @@ type CouponInventoryRequest struct {
 	Percentage    uint   `validate:"required" json:"percentage"`
 	MaximumUsage  uint   `validate:"required" json:"maximum_usage"`
 	MinimumAmount uint   `validate:"required" json:"minimum_amount"`
+}
+
+type AddOfferRequest struct {
+	ProductID   uint    `json:"product_id" binding:"required"`
+	OfferAmount float64 `json:"offer_amount" binding:"required"`
 }

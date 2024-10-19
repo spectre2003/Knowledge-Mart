@@ -75,6 +75,8 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
+	finalAmount := calculateFinalAmount(request.Price, request.OfferAmount, category.OfferPercentage)
+
 	newProduct := models.Product{
 		SellerID:     sellerID.(uint),
 		CategoryID:   request.CategoryID,
@@ -104,10 +106,23 @@ func AddProduct(c *gin.Context) {
 			"describtion":  newProduct.Description,
 			"price":        newProduct.Price,
 			"offer_amount": newProduct.OfferAmount,
+			"final_amount": finalAmount,
 			"image":        newProduct.Image,
 			"availability": newProduct.Availability,
 		},
 	})
+}
+
+func calculateFinalAmount(price, offerAmount float64, offerPercentage uint) float64 {
+	if offerPercentage > 0 {
+		discount := (price * float64(offerPercentage)) / 100
+		finalAmount := offerAmount - discount
+		if finalAmount < 0 {
+			finalAmount = 0
+		}
+		return finalAmount
+	}
+	return offerAmount
 }
 
 func EditProduct(c *gin.Context) {
@@ -416,5 +431,61 @@ func ListAllProduct(c *gin.Context) {
 		"data": gin.H{
 			"products": productResponse,
 		},
+	})
+}
+
+func AddProductOffer(c *gin.Context) {
+	sellerID, exists := c.Get("sellerID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "seller not authorized",
+		})
+		return
+	}
+
+	_, ok := sellerID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve seller information",
+		})
+		return
+	}
+
+	var request models.AddOfferRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Invalid request body ",
+		})
+		return
+	}
+
+	var product models.Product
+
+	if err := database.DB.Where("id = ?", request.ProductID).First(&product).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "failed to find the product",
+		})
+		return
+	}
+
+	product.OfferAmount = request.OfferAmount
+
+	if err := database.DB.Model(&product).Where("id = ?", request.ProductID).Update("offer_amount", request.OfferAmount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to add the offer amount",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "successfully added the offer amount",
+		"data":    product,
 	})
 }

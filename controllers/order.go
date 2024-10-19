@@ -11,7 +11,6 @@ import (
 )
 
 func PlaceOrder(c *gin.Context) {
-	// Retrieve user ID from context
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -73,10 +72,14 @@ func PlaceOrder(c *gin.Context) {
 		})
 		return
 	}
+
 	var TotalAmount float64
+	var finalAmount float64
 	var sellerID uint
+
 	for _, item := range CartItems {
 		Product := item.Product
+
 		if !Product.Availability {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "failed",
@@ -84,7 +87,20 @@ func PlaceOrder(c *gin.Context) {
 			})
 			return
 		}
+
+		var category models.Category
+		if err := database.DB.First(&category, Product.CategoryID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "failed to find category for the product",
+			})
+			return
+		}
+
+		discountedPrice := calculateFinalAmount(Product.Price, Product.OfferAmount, category.OfferPercentage)
+
 		TotalAmount += Product.OfferAmount
+		finalAmount += discountedPrice
 
 		if sellerID == 0 {
 			sellerID = Product.SellerID
@@ -97,6 +113,7 @@ func PlaceOrder(c *gin.Context) {
 		}
 	}
 
+	// Apply coupon discount if available
 	var CouponDiscount float64
 	if request.CouponCode != "" {
 		success, msg, discount := ApplyCouponToOrder(TotalAmount, userIDStr, request.CouponCode)
@@ -109,8 +126,7 @@ func PlaceOrder(c *gin.Context) {
 		}
 		CouponDiscount = discount
 	}
-	finalAmount := TotalAmount
-	finalAmount = TotalAmount - CouponDiscount
+	finalAmount -= CouponDiscount
 
 	var ReferralDiscount float64
 	if request.ReferralCode != "" {
@@ -230,18 +246,29 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 
 	for _, cartItem := range CartItems {
 		Product := cartItem.Product
-		finalPrice := Product.OfferAmount
+
+		var category models.Category
+		if err := database.DB.First(&category, Product.CategoryID).Error; err != nil {
+			tx.Rollback()
+			return false
+		}
+
+		discountedPrice := calculateFinalAmount(Product.Price, Product.OfferAmount, category.OfferPercentage)
+
+		finalPrice := discountedPrice
 		if totalDiscount > 0 {
 			proportionalDiscount := (Product.OfferAmount / totalCartPrice) * totalDiscount
-			finalPrice = Product.OfferAmount - proportionalDiscount
+			finalPrice -= proportionalDiscount
 		}
 
 		orderItem := models.OrderItem{
-			OrderID:   Order.OrderID,
-			ProductID: cartItem.ProductID,
-			UserID:    UserID,
-			SellerID:  Product.SellerID,
-			Price:     finalPrice,
+			OrderID:            Order.OrderID,
+			ProductID:          cartItem.ProductID,
+			UserID:             UserID,
+			SellerID:           Product.SellerID,
+			Price:              finalPrice,
+			ProductOfferAmount: Product.OfferAmount,
+			Status:             models.OrderStatusPending, // Assuming pending status for new items
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {

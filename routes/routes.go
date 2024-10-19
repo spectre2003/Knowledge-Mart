@@ -119,6 +119,9 @@ func RegisterRoutes(router *gin.Engine) {
 		sellerRoutes.GET("/order_list", controllers.GetUserOrders)
 		sellerRoutes.PATCH("/update_order_status", controllers.SellerUpdateOrderStatus)
 		sellerRoutes.PATCH("/order_cancel", controllers.CancelOrder)
+
+		//sales report
+		sellerRoutes.GET("/report/all", controllers.SellerOverAllSalesReport)
 	}
 
 	adminRoutes := router.Group("/admin")

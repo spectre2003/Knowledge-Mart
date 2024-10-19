@@ -84,6 +84,7 @@ type CartResponse struct {
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
 	OfferAmount  float64        `json:"offer_amount"`
+	FinalAmount  float64        `json:"final_amount"`
 	Availability bool           `json:"availability"`
 	Image        pq.StringArray `json:"image_url"`
 	ID           uint           `json:"Id"`
@@ -142,4 +143,28 @@ type OrderItemResponse struct {
 	Price       float64        `json:"price"`
 	SellerName  string         `json:"sellerName"`
 	OrderStatus string         `json:"orderStatus"`
+}
+
+type SellerOverallSalesReport struct {
+	StartDate     string `json:"start_date,omitempty" time_format:"2006-01-02"`
+	EndDate       string `json:"end_date,omitempty" time_format:"2006-01-02"`
+	Limit         string `json:"limit,omitempty"`
+	PaymentStatus string `json:"payment_status"`
+}
+
+type OrderCount struct {
+	TotalOrder     uint `json:"total_order"`
+	TotalPending   uint `json:"total_pending"`
+	TotalConfirmed uint `json:"total_confirmed"`
+	TotalShipped   uint `json:"total_shipped"`
+	TotalDelivered uint `json:"total_delivered"`
+	TotalCancelled uint `json:"total_cancelled"`
+	TotalReturned  uint `json:"total_returned"`
+}
+
+type AmountInformation struct {
+	TotalCouponDeduction float64 `json:"total_coupon_deduction"`
+	//TotalProductOfferDeduction float64 `json:"total_product_offer_deduction"`
+	TotalAmountBeforeDeduction float64 `json:"total_amount_before_deduction"`
+	TotalAmountAfterDeduction  float64 `json:"total_amount_after_deduction"`
 }
