@@ -30,7 +30,6 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Bind and validate the request JSON
 	var request models.PlaceOrder
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -49,7 +48,6 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Fetch the user
 	var User models.User
 	if err := database.DB.Where("id = ?", userIDStr).First(&User).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -59,7 +57,6 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Fetch cart items for the user
 	var CartItems []models.Cart
 	if err := database.DB.Preload("Product").Where("user_id = ?", userIDStr).Find(&CartItems).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -76,8 +73,6 @@ func PlaceOrder(c *gin.Context) {
 		})
 		return
 	}
-
-	// Ensure all products belong to the same seller and calculate the total amount
 	var TotalAmount float64
 	var sellerID uint
 	for _, item := range CartItems {
@@ -102,7 +97,6 @@ func PlaceOrder(c *gin.Context) {
 		}
 	}
 
-	// Apply coupon before creating order
 	var CouponDiscount float64
 	if request.CouponCode != "" {
 		success, msg, discount := ApplyCouponToOrder(TotalAmount, userIDStr, request.CouponCode)
@@ -115,11 +109,24 @@ func PlaceOrder(c *gin.Context) {
 		}
 		CouponDiscount = discount
 	}
+	finalAmount := TotalAmount
+	finalAmount = TotalAmount - CouponDiscount
 
-	// Final total after applying coupon
-	finalAmount := TotalAmount - CouponDiscount
+	var ReferralDiscount float64
+	if request.ReferralCode != "" {
+		success, msg, discount := ApplyReferral(finalAmount, userIDStr, request.ReferralCode)
+		if !success {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": msg,
+			})
+			return
+		}
+		ReferralDiscount = discount
+	}
 
-	// Validate the shipping address
+	finalAmount -= ReferralDiscount
+
 	var Address models.Address
 	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, request.AddressID).First(&Address).Error; err != nil {
 		c.JSON(http.StatusConflict, gin.H{
@@ -129,7 +136,6 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Determine the payment method
 	PaymentMethodOption := ""
 	switch request.PaymentMethod {
 	case 1:
@@ -146,21 +152,20 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Start the database transaction
 	tx := database.DB.Begin()
 
-	// Create order with final amount and discount
 	order := models.Order{
-		UserID:               userIDStr,
-		TotalAmount:          TotalAmount,
-		FinalAmount:          finalAmount,
-		PaymentMethod:        PaymentMethodOption,
-		PaymentStatus:        models.OrderStatusPending,
-		OrderedAt:            time.Now(),
-		CouponCode:           request.CouponCode,
-		CouponDiscountAmount: CouponDiscount,
-		SellerID:             sellerID,
-		Status:               models.OrderStatusPending,
+		UserID:                 userIDStr,
+		TotalAmount:            TotalAmount,
+		FinalAmount:            finalAmount,
+		PaymentMethod:          PaymentMethodOption,
+		PaymentStatus:          models.OrderStatusPending,
+		OrderedAt:              time.Now(),
+		CouponCode:             request.CouponCode,
+		CouponDiscountAmount:   CouponDiscount,
+		ReferralDiscountAmount: ReferralDiscount,
+		SellerID:               sellerID,
+		Status:                 models.OrderStatusPending,
 		ShippingAddress: models.ShippingAddress{
 			StreetName:   Address.StreetName,
 			StreetNumber: Address.StreetNumber,
@@ -180,9 +185,8 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// Transfer cart items to order with possible discount
 	if PaymentMethodOption == models.COD || PaymentMethodOption == models.Wallet {
-		if !CartToOrderItems(userIDStr, order, CouponDiscount) {
+		if !CartToOrderItems(userIDStr, order, CouponDiscount, ReferralDiscount) {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
@@ -205,7 +209,7 @@ func PlaceOrder(c *gin.Context) {
 	})
 }
 
-func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) bool {
+func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, ReferralDiscount float64) bool {
 	var CartItems []models.Cart
 	if err := database.DB.Preload("Product").Where("user_id = ?", UserID).Find(&CartItems).Error; err != nil {
 		return false
@@ -220,14 +224,17 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) b
 		totalCartPrice += cartItem.Product.Price
 	}
 
-	// transaction starts
+	totalDiscount := CouponDiscount + ReferralDiscount
+
 	tx := database.DB.Begin()
 
 	for _, cartItem := range CartItems {
 		Product := cartItem.Product
-		proportionalDiscount := (Product.Price / totalCartPrice) * CouponDiscount
-
-		finalPrice := Product.Price - proportionalDiscount
+		finalPrice := Product.Price
+		if totalDiscount > 0 {
+			proportionalDiscount := (Product.Price / totalCartPrice) * totalDiscount
+			finalPrice = Product.Price - proportionalDiscount
+		}
 
 		orderItem := models.OrderItem{
 			OrderID:   Order.OrderID,
@@ -254,7 +261,6 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) b
 		return false
 	}
 
-	// transaction ends
 	tx.Commit()
 
 	return true

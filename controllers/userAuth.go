@@ -196,18 +196,21 @@ func EmailSignup(c *gin.Context) {
 		return
 	}
 
+	refCode := utils.GenerateRandomString(5)
+
 	otp, otpExpiry := GenerateOTP()
 
 	User := models.User{
-		Name:        Signup.Name,
-		Email:       Signup.Email,
-		PhoneNumber: Signup.PhoneNumber,
-		Blocked:     false,
-		Password:    hashpassword,
-		OTP:         otp,
-		OTPExpiry:   otpExpiry,
-		IsVerified:  false,
-		LoginMethod: "email",
+		Name:         Signup.Name,
+		Email:        Signup.Email,
+		PhoneNumber:  Signup.PhoneNumber,
+		Blocked:      false,
+		Password:     hashpassword,
+		ReferralCode: refCode,
+		OTP:          otp,
+		OTPExpiry:    otpExpiry,
+		IsVerified:   false,
+		LoginMethod:  "email",
 	}
 
 	tx := database.DB.Where("email = ? AND deleted_at IS NULL", Signup.Email).First(&User)

@@ -112,7 +112,8 @@ func VerifyPayment(c *gin.Context) {
 		return
 	}
 
-	discount := order.CouponDiscountAmount
+	couponDiscount := order.CouponDiscountAmount
+	referralDiscount := order.ReferralDiscountAmount
 
 	//finalAmount := order.TotalAmount - discount
 
@@ -153,7 +154,7 @@ func VerifyPayment(c *gin.Context) {
 
 	fmt.Println("Order payment and status updated successfully")
 
-	if !CartToOrderItems(order.UserID, order, discount) {
+	if !CartToOrderItems(order.UserID, order, couponDiscount, referralDiscount) {
 		database.DB.Delete(&order)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
