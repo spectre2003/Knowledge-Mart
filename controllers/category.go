@@ -78,6 +78,7 @@ func ListCategoryProductList(c *gin.Context) {
 			ID:           product.ID,
 			Name:         product.Name,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Description:  product.Description,
 			Image:        product.Image,
 			Availability: product.Availability,

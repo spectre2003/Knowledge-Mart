@@ -155,6 +155,7 @@ func ListAllWhishList(c *gin.Context) {
 			CategoryID:   whishlist.Product.CategoryID,
 			Description:  whishlist.Product.Description,
 			Price:        whishlist.Product.Price,
+			OfferAmount:  whishlist.Product.OfferAmount,
 			Availability: whishlist.Product.Availability,
 			Image:        whishlist.Product.Image,
 			SellerRating: seller.AverageRating,

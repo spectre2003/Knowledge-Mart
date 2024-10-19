@@ -84,7 +84,7 @@ func PlaceOrder(c *gin.Context) {
 			})
 			return
 		}
-		TotalAmount += Product.Price
+		TotalAmount += Product.OfferAmount
 
 		if sellerID == 0 {
 			sellerID = Product.SellerID
@@ -221,7 +221,7 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 
 	var totalCartPrice float64
 	for _, cartItem := range CartItems {
-		totalCartPrice += cartItem.Product.Price
+		totalCartPrice += cartItem.Product.OfferAmount
 	}
 
 	totalDiscount := CouponDiscount + ReferralDiscount
@@ -230,10 +230,10 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 
 	for _, cartItem := range CartItems {
 		Product := cartItem.Product
-		finalPrice := Product.Price
+		finalPrice := Product.OfferAmount
 		if totalDiscount > 0 {
-			proportionalDiscount := (Product.Price / totalCartPrice) * totalDiscount
-			finalPrice = Product.Price - proportionalDiscount
+			proportionalDiscount := (Product.OfferAmount / totalCartPrice) * totalDiscount
+			finalPrice = Product.OfferAmount - proportionalDiscount
 		}
 
 		orderItem := models.OrderItem{
@@ -316,6 +316,7 @@ func GetUserOrders(c *gin.Context) {
 					Description: product.Description,
 					Image:       product.Image,
 					Price:       product.Price,
+					OfferAmount: product.OfferAmount,
 					OrderItemID: item.OrderItemID,
 				})
 			}

@@ -81,6 +81,7 @@ func AddProduct(c *gin.Context) {
 		Name:         request.Name,
 		Description:  request.Description,
 		Price:        request.Price,
+		OfferAmount:  request.OfferAmount,
 		Image:        request.Image,
 		Availability: true,
 	}
@@ -102,6 +103,7 @@ func AddProduct(c *gin.Context) {
 			"seller_id":    newProduct.SellerID,
 			"describtion":  newProduct.Description,
 			"price":        newProduct.Price,
+			"offer_amount": newProduct.OfferAmount,
 			"image":        newProduct.Image,
 			"availability": newProduct.Availability,
 		},
@@ -185,6 +187,17 @@ func EditProduct(c *gin.Context) {
 		existingProduct.Price = Request.Price
 	}
 
+	if Request.OfferAmount != 0 {
+		if Request.OfferAmount <= 0 && Request.OfferAmount < Request.Price {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "price must be a positive number",
+			})
+			return
+		}
+		existingProduct.OfferAmount = Request.OfferAmount
+	}
+
 	if len(Request.Image) > 0 {
 		existingProduct.Image = Request.Image
 	}
@@ -222,6 +235,7 @@ func EditProduct(c *gin.Context) {
 			"name":         existingProduct.Name,
 			"description":  existingProduct.Description,
 			"price":        existingProduct.Price,
+			"offer_amount": existingProduct.OfferAmount,
 			"image":        existingProduct.Image,
 			"availability": existingProduct.Availability,
 			"categoryID":   existingProduct.CategoryID,
@@ -334,6 +348,7 @@ func ListProductBySeller(c *gin.Context) {
 			ID:           product.ID,
 			Name:         product.Name,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Description:  product.Description,
 			Image:        product.Image,
 			Availability: product.Availability,
@@ -386,6 +401,7 @@ func ListAllProduct(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,

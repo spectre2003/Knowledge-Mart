@@ -11,7 +11,7 @@ import (
 func SearchProductLtoH(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("price ASC").Find(&products)
+	tx := database.DB.Where("availability = ?", true).Order("offer_amount ASC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -36,6 +36,7 @@ func SearchProductLtoH(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
@@ -56,7 +57,7 @@ func SearchProductLtoH(c *gin.Context) {
 func SearchProductHtoL(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("price DESC").Find(&products)
+	tx := database.DB.Where("availability = ?", true).Order("offer_amount DESC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -81,6 +82,7 @@ func SearchProductHtoL(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
@@ -126,6 +128,7 @@ func SearchProductNew(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
@@ -136,7 +139,7 @@ func SearchProductNew(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully retrieved products sorted by price",
+		"message": "successfully retrieved products sorted by new arrival",
 		"data": gin.H{
 			"products": productResponse,
 		},
@@ -171,6 +174,7 @@ func SearchProductAtoZ(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
@@ -181,7 +185,7 @@ func SearchProductAtoZ(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully retrieved products sorted by price",
+		"message": "successfully retrieved products sorted by alphabetic order",
 		"data": gin.H{
 			"products": productResponse,
 		},
@@ -216,6 +220,7 @@ func SearchProductZtoA(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,
@@ -226,7 +231,7 @@ func SearchProductZtoA(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully retrieved products sorted by price",
+		"message": "successfully retrieved products sorted by reverce alphbetic order",
 		"data": gin.H{
 			"products": productResponse,
 		},
@@ -267,6 +272,7 @@ func SearchProductHighRatedFirst(c *gin.Context) {
 			Name:         product.Name,
 			Description:  product.Description,
 			Price:        product.Price,
+			OfferAmount:  product.OfferAmount,
 			Image:        product.Image,
 			Availability: product.Availability,
 			SellerID:     product.SellerID,

@@ -34,6 +34,7 @@ type AddProductRequest struct {
 	Name        string         `validate:"required" json:"name"`
 	Description string         `validate:"required" json:"description"`
 	Price       float64        `validate:"required,number" json:"price"`
+	OfferAmount float64        `validate:"required,number" json:"offer_amount"`
 	Image       pq.StringArray `validate:"required,dive,url" json:"image_url"`
 }
 
@@ -42,6 +43,7 @@ type EditProductRequest struct {
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
+	OfferAmount  float64        `json:"offer_amount"`
 	Image        pq.StringArray `json:"image_url"`
 	Availability *bool          `json:"availability"`
 	CategoryID   uint           `json:"categoryid"`

@@ -160,7 +160,7 @@ func ListAllCart(c *gin.Context) {
 	ItemCount := 0
 
 	for _, cart := range Carts {
-		TotalAmount += cart.Product.Price
+		TotalAmount += cart.Product.OfferAmount
 		ItemCount++
 
 		var seller models.Seller
@@ -178,6 +178,7 @@ func ListAllCart(c *gin.Context) {
 			CategoryID:   cart.Product.CategoryID,
 			Description:  cart.Product.Description,
 			Price:        cart.Product.Price,
+			OfferAmount:  cart.Product.OfferAmount,
 			Availability: cart.Product.Availability,
 			Image:        cart.Product.Image,
 			SellerRating: seller.AverageRating,

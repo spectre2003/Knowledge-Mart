@@ -326,6 +326,7 @@ func ApplyCouponOnCart(c *gin.Context) {
 			CategoryID:   item.Product.CategoryID,
 			Description:  item.Product.Description,
 			Price:        item.Product.Price,
+			OfferAmount:  item.Product.OfferAmount,
 			Availability: item.Product.Availability,
 			Image:        item.Product.Image,
 			SellerRating: Product.Seller.AverageRating,
@@ -333,7 +334,7 @@ func ApplyCouponOnCart(c *gin.Context) {
 		})
 
 		//ProductOfferAmount += float64(ProductOfferAmount) * float64()
-		sum += Product.Price
+		sum += Product.OfferAmount
 
 	}
 	var couponDiscount float64

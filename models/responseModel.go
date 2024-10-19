@@ -12,6 +12,7 @@ type ProductResponse struct {
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
+	OfferAmount  float64        `json:"offer_amount"`
 	Image        pq.StringArray `json:"image_url"`
 	Availability bool           `json:"availability"`
 	SellerID     uint           `json:"sellerid"`
@@ -82,6 +83,7 @@ type CartResponse struct {
 	CategoryID   uint           `json:"categoryId"`
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
+	OfferAmount  float64        `json:"offer_amount"`
 	Availability bool           `json:"availability"`
 	Image        pq.StringArray `json:"image_url"`
 	ID           uint           `json:"Id"`
@@ -107,6 +109,7 @@ type ProductArray struct {
 	Description string         `json:"description"`
 	Image       pq.StringArray `json:"image_url"`
 	Price       float64        `json:"price"`
+	OfferAmount float64        `json:"offer_amount"`
 	OrderItemID uint           `json:"orderItemId"`
 }
 
