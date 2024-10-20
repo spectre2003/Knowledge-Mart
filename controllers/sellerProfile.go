@@ -49,11 +49,12 @@ func GetSellerProfile(c *gin.Context) {
 		"status":  "success",
 		"message": "successfully retrieved seller profile",
 		"data": gin.H{
-			"username of seller": seller.UserName,
-			"seller name":        seller.User.Name,
+			"username_of_seller": seller.UserName,
+			"seller_name":        seller.User.Name,
 			"describtion":        seller.Description,
-			"seller id":          seller.ID,
-			"average rating":     seller.AverageRating,
+			"seller_id":          seller.ID,
+			"average_rating":     seller.AverageRating,
+			"wallet_amount":      seller.WalletAmount,
 		},
 	})
 }

@@ -115,8 +115,6 @@ func VerifyPayment(c *gin.Context) {
 	couponDiscount := order.CouponDiscountAmount
 	referralDiscount := order.ReferralDiscountAmount
 
-	//finalAmount := order.TotalAmount - discount
-
 	payment := models.Payment{
 		OrderID:           orderIDStr,
 		WalletPaymentID:   "",

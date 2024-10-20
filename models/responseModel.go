@@ -43,10 +43,11 @@ type SellerResponse struct {
 }
 
 type CatgoryResponse struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Image       string `json:"image"`
+	ID              uint   `json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Image           string `json:"image"`
+	OfferPercentage uint   `json:"offer_percentage"`
 }
 
 type GoogleResponse struct {
@@ -71,10 +72,12 @@ type AddressResponse struct {
 }
 
 type UserProfileResponse struct {
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	PhoneNumber string `json:"phone_number"`
-	Picture     string `json:"picture"`
+	Name         string  `json:"name"`
+	Email        string  `json:"email"`
+	PhoneNumber  string  `json:"phone_number"`
+	Picture      string  `json:"picture"`
+	ReferralCode string  `json:"referral_code"`
+	WalletAmount float64 `json:"wallet_amount"`
 }
 
 type CartResponse struct {
@@ -126,7 +129,8 @@ type GetSellerOrderStatusResponse struct {
 type UserOrderResponse struct {
 	OrderID         uint                `json:"orderId"`
 	OrderedAt       time.Time           `json:"orderedAt"`
-	FinalAmount     float64             `json:"totalAmount"`
+	TotalAmount     float64             `json:"total_amount"`
+	FinalAmount     float64             `json:"final_amount"`
 	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 	Status          string              `json:"orderStatus"`
 	PaymentStatus   string              `json:"paymentStatus"`

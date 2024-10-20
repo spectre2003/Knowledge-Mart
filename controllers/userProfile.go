@@ -47,10 +47,12 @@ func GetUserProfile(c *gin.Context) {
 		return
 	}
 	userProfile := models.UserProfileResponse{
-		Name:        user.Name,
-		Email:       user.Email,
-		PhoneNumber: user.PhoneNumber,
-		Picture:     user.Picture,
+		Name:         user.Name,
+		Email:        user.Email,
+		PhoneNumber:  user.PhoneNumber,
+		Picture:      user.Picture,
+		ReferralCode: user.ReferralCode,
+		WalletAmount: user.WalletAmount,
 	}
 
 	c.JSON(http.StatusOK, gin.H{

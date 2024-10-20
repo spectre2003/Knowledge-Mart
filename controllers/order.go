@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"net/http"
@@ -201,7 +202,19 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	if PaymentMethodOption == models.COD || PaymentMethodOption == models.Wallet {
+	if PaymentMethodOption == models.Wallet {
+		orderIDStr := fmt.Sprintf("%d", order.OrderID)
+		if _, err := ProcessWalletPayment(userIDStr, orderIDStr, CouponDiscount, ReferralDiscount, tx); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": err.Error(),
+			})
+			return
+		}
+	}
+
+	if PaymentMethodOption == models.COD {
 		if !CartToOrderItems(userIDStr, order, CouponDiscount, ReferralDiscount) {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -268,7 +281,7 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 			SellerID:           Product.SellerID,
 			Price:              finalPrice,
 			ProductOfferAmount: Product.OfferAmount,
-			Status:             models.OrderStatusPending, // Assuming pending status for new items
+			Status:             models.OrderStatusConfirmed,
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {
@@ -354,8 +367,8 @@ func GetUserOrders(c *gin.Context) {
 			SellerID:        order.SellerID,
 			PaymentMethod:   order.PaymentMethod,
 			PaymentStatus:   order.PaymentStatus,
-			TotalAmount:     order.TotalAmount,
-			FinalAmount:     order.FinalAmount,
+			TotalAmount:     RoundDecimalValue(order.TotalAmount),
+			FinalAmount:     RoundDecimalValue(order.FinalAmount),
 			OrderStatus:     order.Status,
 			Product:         products,
 			ShippingAddress: order.ShippingAddress,
@@ -604,16 +617,16 @@ func UserCheckOrderStatus(c *gin.Context) {
 			statusCounts["Confirmed"] = countConfirmed
 		}
 
-		// Create response for each order, including the filtered non-zero item counts
 		userOrderResponses = append(userOrderResponses, models.UserOrderResponse{
 			OrderID:         order.OrderID,
 			OrderedAt:       order.OrderedAt,
-			FinalAmount:     order.FinalAmount,
+			TotalAmount:     RoundDecimalValue(order.TotalAmount),
+			FinalAmount:     RoundDecimalValue(order.FinalAmount),
 			Items:           orderItemResponses,
 			Status:          order.Status,
 			PaymentStatus:   order.PaymentStatus,
 			ShippingAddress: order.ShippingAddress,
-			ItemCounts:      statusCounts, // Include non-zero status counts
+			ItemCounts:      statusCounts,
 		})
 	}
 
@@ -713,7 +726,7 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		err := RefundToUser(tx, id, orderId, orderItem.Price, "Single item canceled")
+		err := RefundToUser(tx, id, orderId, orderItem.Price, "Single item canceled", isSeller)
 		if err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -779,7 +792,7 @@ func CancelOrder(c *gin.Context) {
 		}
 	}
 
-	err := RefundToUser(tx, id, orderId, orders.TotalAmount, "Entire order canceled")
+	err := RefundToUser(tx, id, orderId, orders.FinalAmount, "Entire order canceled", isSeller)
 	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -838,6 +851,8 @@ func ReturnOrder(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
+	isSeller := false
+
 	// Return single item
 	if itemId != "" {
 		var orderItem models.OrderItem
@@ -850,7 +865,6 @@ func ReturnOrder(c *gin.Context) {
 			return
 		}
 
-		// Update order item status to returned
 		orderItem.Status = models.OrderStatusReturned
 		if err := tx.Model(&orderItem).Update("status", orderItem.Status).Error; err != nil {
 			tx.Rollback()
@@ -861,7 +875,16 @@ func ReturnOrder(c *gin.Context) {
 			return
 		}
 
-		// Update product availability
+		orders.TotalAmount -= orderItem.Price
+		if err := tx.Model(&orders).Update("total_amount", orders.TotalAmount).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to update order total",
+			})
+			return
+		}
+
 		orderItem.Product.Availability = true
 		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
 			tx.Rollback()
@@ -873,7 +896,7 @@ func ReturnOrder(c *gin.Context) {
 		}
 
 		// Process refund for a single item
-		err := RefundToUser(tx, userIDStr, orderId, orderItem.Price, "Single item returned")
+		err := RefundToUser(tx, userIDStr, orderId, orderItem.Price, "Single item returned", isSeller)
 		if err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -892,7 +915,6 @@ func ReturnOrder(c *gin.Context) {
 		return
 	}
 
-	// Returning the entire order
 	orders.Status = models.OrderStatusReturned
 	orders.PaymentStatus = models.PaymentStatusRefund
 	if err := tx.Model(&orders).Updates(map[string]interface{}{
@@ -907,7 +929,6 @@ func ReturnOrder(c *gin.Context) {
 		return
 	}
 
-	// Find all items associated with the order
 	var orderItems []models.OrderItem
 	if err := tx.Preload("Product").Where("order_id = ?", orderId).Find(&orderItems).Error; err != nil {
 		tx.Rollback()
@@ -919,7 +940,6 @@ func ReturnOrder(c *gin.Context) {
 	}
 
 	for _, orderItem := range orderItems {
-		// Update order item status to returned
 		orderItem.Status = models.OrderStatusReturned
 		if err := tx.Model(&orderItem).Update("status", orderItem.Status).Error; err != nil {
 			tx.Rollback()
@@ -930,7 +950,6 @@ func ReturnOrder(c *gin.Context) {
 			return
 		}
 
-		// Update product availability
 		orderItem.Product.Availability = true
 		if err := tx.Model(&orderItem.Product).Update("availability", orderItem.Product.Availability).Error; err != nil {
 			tx.Rollback()
@@ -942,8 +961,7 @@ func ReturnOrder(c *gin.Context) {
 		}
 	}
 
-	// Process refund for the entire order
-	err := RefundToUser(tx, userIDStr, orderId, orders.TotalAmount, "Entire order canceled")
+	err := RefundToUser(tx, userIDStr, orderId, orders.FinalAmount, "Entire order canceled", isSeller)
 	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{

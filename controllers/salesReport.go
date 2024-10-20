@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SellerOverAllSalesReport generates an overall sales report for the seller
 func SellerOverAllSalesReport(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
@@ -39,13 +38,11 @@ func SellerOverAllSalesReport(c *gin.Context) {
 		return
 	}
 
-	// Validate input
 	if input.StartDate == "" && input.EndDate == "" && input.Limit == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "please provide start date and end date, or specify the limit as day, week, month, year"})
 		return
 	}
 
-	// Validate and process limit
 	if input.Limit != "" {
 		limits := []string{"day", "week", "month", "year"}
 		found := false
@@ -61,7 +58,6 @@ func SellerOverAllSalesReport(c *gin.Context) {
 			return
 		}
 
-		// Determine date range based on limit
 		var startDate, endDate string
 		switch input.Limit {
 		case "day":
@@ -82,7 +78,6 @@ func SellerOverAllSalesReport(c *gin.Context) {
 			endDate = time.Now().Format("2006-01-02")
 		}
 
-		// Fetch results based on the limit
 		result, amount, err := TotalOrders(startDate, endDate, input.PaymentStatus, sellerIDStr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
@@ -97,7 +92,6 @@ func SellerOverAllSalesReport(c *gin.Context) {
 		return
 	}
 
-	// Validate start and end date if limit is not provided
 	if input.StartDate != "" && input.EndDate != "" {
 		startDate, err := time.Parse("2006-01-02", input.StartDate)
 		if err != nil {
@@ -117,7 +111,6 @@ func SellerOverAllSalesReport(c *gin.Context) {
 		}
 	}
 
-	// Fetch results based on date range
 	result, amount, err := TotalOrders(input.StartDate, input.EndDate, input.PaymentStatus, sellerIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
@@ -132,7 +125,6 @@ func SellerOverAllSalesReport(c *gin.Context) {
 	})
 }
 
-// TotalOrders calculates the total order count and amount information for the given date range and payment status
 func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) (models.OrderCount, models.AmountInformation, error) {
 	var orders []models.Order
 
@@ -152,7 +144,6 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 	startTime := fFrom.Format("2006-01-02T15:04:05Z")
 	endDate := fTill.Format("2006-01-02T15:04:05Z")
 
-	// Query orders for the seller within the given time range
 	if SellerID != 0 {
 		if err := database.DB.Where("ordered_at BETWEEN ? AND ? AND payment_status = ? AND seller_id = ?", startTime, endDate, PaymentStatus, SellerID).Find(&orders).Error; err != nil {
 			return models.OrderCount{}, models.AmountInformation{}, errors.New("error fetching orders")
@@ -174,13 +165,11 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 
 	var AccountInformation models.AmountInformation
 
-	// Process each order and calculate amounts and status counts
 	for _, order := range orders {
 		AccountInformation.TotalCouponDeduction += RoundDecimalValue(order.CouponDiscountAmount)
 		AccountInformation.TotalAmountBeforeDeduction += RoundDecimalValue(order.TotalAmount)
 		AccountInformation.TotalAmountAfterDeduction += RoundDecimalValue(order.FinalAmount)
 
-		// Count order status occurrences
 		for _, status := range []string{
 			models.OrderStatusPending,
 			models.OrderStatusConfirmed,
@@ -202,7 +191,6 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 		totalCount += count
 	}
 
-	// Return total order count and amount information
 	return models.OrderCount{
 		TotalOrder:     uint(totalCount),
 		TotalPending:   uint(orderStatusCounts[models.OrderStatusPending]),
@@ -214,7 +202,6 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 	}, AccountInformation, nil
 }
 
-// RoundDecimalValue rounds a float64 value to 2 decimal places
 func RoundDecimalValue(value float64) float64 {
 	multiplier := math.Pow(10, 2)
 	return math.Round(value*multiplier) / multiplier

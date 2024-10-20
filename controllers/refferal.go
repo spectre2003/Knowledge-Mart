@@ -137,7 +137,6 @@ func ApplyReferralOnCart(c *gin.Context) {
 
 func ApplyReferral(totalAmount float64, userID uint, refCode string) (bool, string, float64) {
 	var userReferralHistory models.UserReferralHistory
-
 	if err := database.DB.Where("user_id = ?", userID).First(&userReferralHistory).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, "database error occurred while checking referral history", 0

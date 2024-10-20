@@ -305,6 +305,19 @@ func EmailLogin(c *gin.Context) {
 		return
 	}
 
+	if User.ReferralCode == "" {
+		refCode := utils.GenerateRandomString(5)
+		User.ReferralCode = refCode
+
+		if err := database.DB.Model(&User).Update("referral_code", User.ReferralCode).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "failed to update referral code",
+			})
+			return
+		}
+	}
+
 	token, err := utils.GenerateJWT(User.ID, "user")
 	if token == "" || err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

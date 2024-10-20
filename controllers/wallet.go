@@ -12,47 +12,160 @@ import (
 )
 
 func AddMoneyToSellerWallet(OrderID string) bool {
-	var Order models.Order
-	if err := database.DB.Where("order_id = ?", OrderID).First(&Order).Error; err != nil {
-		return false
-	}
-	var Seller models.Seller
-	if err := database.DB.Where("id = ?", Order.SellerID).First(&Seller).Error; err != nil {
+	var order models.Order
+	if err := database.DB.Where("order_id = ?", OrderID).First(&order).Error; err != nil {
+		fmt.Println("Error fetching order:", err)
 		return false
 	}
 
-	Seller.WalletAmount += Order.FinalAmount
+	var seller models.Seller
+	if err := database.DB.Where("id = ?", order.SellerID).First(&seller).Error; err != nil {
+		fmt.Println("Error fetching seller:", err)
+		return false
+	}
+
+	finalAmount := RoundDecimalValue(order.FinalAmount)
+	fmt.Println("Final Amount (Rounded):", finalAmount)
+
+	if finalAmount < 0 {
+		fmt.Println("Error: Negative final amount:", finalAmount)
+		return false
+	}
+
+	seller.WalletAmount += finalAmount
+	fmt.Println("Updated Wallet Amount:", seller.WalletAmount)
 
 	sellerWallet := models.SellerWallet{
 		TransactionTime: time.Now(),
 		Type:            models.WalletIncoming,
-		OrderID:         Order.OrderID,
-		SellerID:        Order.SellerID,
-		Amount:          Order.FinalAmount,
-		CurrentBalance:  Seller.WalletAmount,
+		OrderID:         order.OrderID,
+		SellerID:        order.SellerID,
+		Amount:          finalAmount,
+		CurrentBalance:  seller.WalletAmount,
 		Reason:          "Order Payment",
 	}
 
 	if err := database.DB.Create(&sellerWallet).Error; err != nil {
+		fmt.Println("Error creating seller wallet record:", err)
 		return false
 	}
 
-	if err := database.DB.Model(&Seller).Update("wallet_amount = ?", sellerWallet.CurrentBalance).Error; err != nil {
+	if err := database.DB.Model(&seller).Update("wallet_amount", sellerWallet.CurrentBalance).Error; err != nil {
+		fmt.Println("Error updating seller's wallet balance:", err)
 		return false
 	}
 
+	fmt.Println("Seller wallet updated successfully")
 	return true
 }
 
-func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, reason string) error {
+func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, reason string, isSeller bool) error {
 	orderIDUint, err := strconv.ParseUint(orderIDStr, 10, 32)
 	if err != nil {
 		return fmt.Errorf("invalid orderID format: %w", err)
 	}
 	orderID := uint(orderIDUint)
 
-	var wallet models.UserWallet
+	var order models.Order
+	if err := tx.Where("order_id = ?", orderID).First(&order).Error; err != nil {
+		return fmt.Errorf("failed to find order with ID %d: %w", orderID, err)
+	}
 
+	if !isSeller {
+		var wallet models.UserWallet
+
+		err = tx.Where("user_id = ?", userID).First(&wallet).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				wallet = models.UserWallet{
+					UserID:         userID,
+					CurrentBalance: amount,
+				}
+				if err := tx.Create(&wallet).Error; err != nil {
+					return fmt.Errorf("failed to create new wallet: %w", err)
+				}
+			} else {
+				return fmt.Errorf("failed to retrieve wallet: %w", err)
+			}
+		} else {
+			wallet.CurrentBalance += amount
+		}
+
+		walletTransaction := models.UserWallet{
+			UserID:          userID,
+			WalletPaymentID: fmt.Sprintf("WALLET_%d", time.Now().Unix()),
+			Type:            "incoming",
+			OrderID:         orderIDStr,
+			Amount:          amount,
+			CurrentBalance:  wallet.CurrentBalance,
+			Reason:          reason,
+			TransactionTime: time.Now(),
+		}
+
+		if err := tx.Create(&walletTransaction).Error; err != nil {
+			return fmt.Errorf("failed to create wallet transaction: %w", err)
+		}
+
+		if err := tx.Model(&wallet).Where("user_id = ?", userID).Update("current_balance", wallet.CurrentBalance).Error; err != nil {
+			return fmt.Errorf("failed to update wallet balance: %w", err)
+		}
+
+		if err := tx.Model(&models.User{}).Where("id = ?", userID).Update("wallet_amount", wallet.CurrentBalance).Error; err != nil {
+			return fmt.Errorf("failed to update user wallet balance: %w", err)
+		}
+
+		var seller models.Seller
+		if err := tx.Where("id = ?", order.SellerID).First(&seller).Error; err != nil {
+			return fmt.Errorf("failed to find seller with ID %d: %w", order.SellerID, err)
+		}
+
+		seller.WalletAmount -= amount
+		if err := tx.Model(&seller).Update("wallet_amount", seller.WalletAmount).Error; err != nil {
+			return fmt.Errorf("failed to update seller wallet amount: %w", err)
+		}
+
+		sellerWalletTransaction := models.SellerWallet{
+			TransactionTime: time.Now(),
+			Type:            "outgoing",
+			OrderID:         order.OrderID,
+			SellerID:        seller.ID,
+			Amount:          amount,
+			CurrentBalance:  seller.WalletAmount,
+			Reason:          "Refund due to user-initiated return/cancellation",
+		}
+
+		if err := tx.Create(&sellerWalletTransaction).Error; err != nil {
+			return fmt.Errorf("failed to create seller wallet transaction: %w", err)
+		}
+
+		return nil
+	}
+
+	var seller models.Seller
+	if err := tx.Where("id = ?", order.SellerID).First(&seller).Error; err != nil {
+		return fmt.Errorf("failed to find seller with ID %d: %w", order.SellerID, err)
+	}
+
+	seller.WalletAmount -= amount
+	if err := tx.Model(&seller).Update("wallet_amount", seller.WalletAmount).Error; err != nil {
+		return fmt.Errorf("failed to update seller wallet amount: %w", err)
+	}
+
+	sellerWalletTransaction := models.SellerWallet{
+		TransactionTime: time.Now(),
+		Type:            "outgoing",
+		OrderID:         order.OrderID,
+		SellerID:        seller.ID,
+		Amount:          amount,
+		CurrentBalance:  seller.WalletAmount,
+		Reason:          "Refund for order cancellation initiated by seller",
+	}
+
+	if err := tx.Create(&sellerWalletTransaction).Error; err != nil {
+		return fmt.Errorf("failed to create seller wallet transaction: %w", err)
+	}
+
+	var wallet models.UserWallet
 	err = tx.Where("user_id = ?", userID).First(&wallet).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,7 +173,6 @@ func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, r
 				UserID:         userID,
 				CurrentBalance: amount,
 			}
-
 			if err := tx.Create(&wallet).Error; err != nil {
 				return fmt.Errorf("failed to create new wallet: %w", err)
 			}
@@ -70,6 +182,7 @@ func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, r
 	} else {
 		wallet.CurrentBalance += amount
 	}
+
 	walletTransaction := models.UserWallet{
 		UserID:          userID,
 		WalletPaymentID: fmt.Sprintf("WALLET_%d", time.Now().Unix()),
@@ -89,52 +202,17 @@ func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, r
 		return fmt.Errorf("failed to update wallet balance: %w", err)
 	}
 
-	var User models.User
+	fmt.Println("wallet amount")
+	fmt.Println(wallet.CurrentBalance)
 
-	if err := tx.Where("id = ?", userID).First(&User).Error; err != nil {
-		return fmt.Errorf("failed to find the user: %w", err)
-	}
-
-	if err := tx.Model(&User).Where("id = ?", userID).Update("wallet_amount", wallet.CurrentBalance).Error; err != nil {
+	if err := tx.Model(&models.User{}).Where("id = ?", userID).Update("wallet_amount", wallet.CurrentBalance).Error; err != nil {
 		return fmt.Errorf("failed to update user wallet balance: %w", err)
-	}
-	var order models.Order
-	if err := tx.Where("order_id = ?", orderID).First(&order).Error; err != nil {
-		return fmt.Errorf("failed to find order with ID %d: %w", orderID, err)
-	}
-
-	if order.SellerID == 0 {
-		return fmt.Errorf("invalid seller ID in order ID %d", orderID)
-	}
-
-	var seller models.Seller
-	if err := tx.Where("id = ?", order.SellerID).First(&seller).Error; err != nil {
-		return fmt.Errorf("failed to find seller with ID %d: %w", order.SellerID, err)
-	}
-	seller.WalletAmount -= amount
-
-	sellerWalletTransaction := models.SellerWallet{
-		TransactionTime: time.Now(),
-		Type:            "outgoing",
-		OrderID:         orderID,
-		SellerID:        seller.ID,
-		Amount:          amount,
-		CurrentBalance:  seller.WalletAmount,
-		Reason:          "Refund for order cancellation",
-	}
-
-	if err := tx.Model(&seller).Where("id = ?", seller.ID).Update("wallet_amount", sellerWalletTransaction.CurrentBalance).Error; err != nil {
-		return fmt.Errorf("failed to update seller wallet amount: %w", err)
-	}
-
-	if err := tx.Create(&sellerWalletTransaction).Error; err != nil {
-		return fmt.Errorf("failed to create seller wallet transaction: %w", err)
 	}
 
 	return nil
 }
 
-func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.UserWallet, error) {
+func ProcessWalletPayment(userID uint, orderIDStr string, couponDiscount float64, referralDiscount float64, tx *gorm.DB) (models.UserWallet, error) {
 	var User models.User
 	if err := tx.Where("id = ?", userID).First(&User).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to find the user")
@@ -152,6 +230,7 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 	if Order.PaymentMethod != models.Wallet {
 		return models.UserWallet{}, fmt.Errorf("incorrect payment method")
 	}
+
 	newBalance := User.WalletAmount - Order.FinalAmount
 	if err := tx.Model(&User).Update("wallet_amount", newBalance).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to update user wallet balance")
@@ -195,6 +274,7 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 	if err := tx.Create(&newSellerWallet).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to create seller transaction record")
 	}
+
 	payment := models.Payment{
 		OrderID:         orderIDStr,
 		WalletPaymentID: newUserWallet.WalletPaymentID,
@@ -216,17 +296,22 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 		return models.UserWallet{}, fmt.Errorf("failed to update payment and order status")
 	}
 
-	var OrderItem []models.OrderItem
-
-	if err := tx.Where("order_id = ?", orderIDStr).First(&OrderItem).Error; err != nil {
-		return models.UserWallet{}, fmt.Errorf("failed to find the order item")
+	if !CartToOrderItems(userID, Order, couponDiscount, referralDiscount) {
+		tx.Rollback()
+		return models.UserWallet{}, fmt.Errorf("failed to transfer cart items to order")
 	}
 
-	for _, orderItem := range OrderItem {
+	var orderItems []models.OrderItem
+	if err := tx.Where("order_id = ?", orderIDStr).Find(&orderItems).Error; err != nil {
+		return models.UserWallet{}, fmt.Errorf("failed to find the order items")
+	}
+
+	for _, orderItem := range orderItems {
 		orderItem.Status = models.OrderStatusConfirmed
 		if err := tx.Model(&orderItem).Update("status", orderItem.Status).Error; err != nil {
 			return models.UserWallet{}, fmt.Errorf("failed to update order item status for item ID")
 		}
 	}
+
 	return newUserWallet, nil
 }

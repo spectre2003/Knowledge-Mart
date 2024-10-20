@@ -27,10 +27,11 @@ func ListAllCategory(c *gin.Context) {
 
 	for _, category := range Categories {
 		categoryResponse = append(categoryResponse, models.CatgoryResponse{
-			ID:          category.ID,
-			Name:        category.Name,
-			Description: category.Description,
-			Image:       category.Image,
+			ID:              category.ID,
+			Name:            category.Name,
+			Description:     category.Description,
+			Image:           category.Image,
+			OfferPercentage: category.OfferPercentage,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
