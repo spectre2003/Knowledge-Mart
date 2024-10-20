@@ -5,9 +5,11 @@ import (
 	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -314,4 +316,84 @@ func ProcessWalletPayment(userID uint, orderIDStr string, couponDiscount float64
 	}
 
 	return newUserWallet, nil
+}
+
+func GetUserWalletHistory(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "user not authorized",
+		})
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve user information",
+		})
+		return
+	}
+	var walletHistory []models.UserWallet
+	if err := database.DB.Where("user_id = ?", uint(userIDUint)).Order("transaction_time desc").Find(&walletHistory).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status": "failed",
+				"error":  "No wallet history found for the user",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "Failed to fetch wallet history",
+			"status": "failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "success",
+		"wallet_history": walletHistory,
+	})
+}
+
+func GetSellerWalletHistory(c *gin.Context) {
+	sellerID, exists := c.Get("sellerID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "user not authorized",
+		})
+		return
+	}
+
+	sellerIDUint, ok := sellerID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve user information",
+		})
+		return
+	}
+	var walletHistory []models.SellerWallet
+	if err := database.DB.Where("user_id = ?", uint(sellerIDUint)).Order("transaction_time desc").Find(&walletHistory).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status": "failed",
+				"error":  "No wallet history found for the seller",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "Failed to fetch wallet history",
+			"status": "failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "success",
+		"wallet_history": walletHistory,
+	})
 }

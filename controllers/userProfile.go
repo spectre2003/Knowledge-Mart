@@ -52,7 +52,7 @@ func GetUserProfile(c *gin.Context) {
 		PhoneNumber:  user.PhoneNumber,
 		Picture:      user.Picture,
 		ReferralCode: user.ReferralCode,
-		WalletAmount: user.WalletAmount,
+		WalletAmount: RoundDecimalValue(user.WalletAmount),
 	}
 
 	c.JSON(http.StatusOK, gin.H{

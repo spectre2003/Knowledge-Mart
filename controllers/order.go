@@ -4,12 +4,18 @@ import (
 	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"math"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
+
+func RoundDecimalValue(value float64) float64 {
+	multiplier := math.Pow(10, 2)
+	return math.Round(value*multiplier) / multiplier
+}
 
 func PlaceOrder(c *gin.Context) {
 	userID, exists := c.Get("userID")

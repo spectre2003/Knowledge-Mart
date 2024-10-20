@@ -54,7 +54,7 @@ func GetSellerProfile(c *gin.Context) {
 			"describtion":        seller.Description,
 			"seller_id":          seller.ID,
 			"average_rating":     seller.AverageRating,
-			"wallet_amount":      seller.WalletAmount,
+			"wallet_amount":      RoundDecimalValue(seller.WalletAmount),
 		},
 	})
 }

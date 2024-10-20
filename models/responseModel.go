@@ -170,5 +170,6 @@ type AmountInformation struct {
 	TotalCouponDeduction float64 `json:"total_coupon_deduction"`
 	//TotalProductOfferDeduction float64 `json:"total_product_offer_deduction"`
 	TotalAmountBeforeDeduction float64 `json:"total_amount_before_deduction"`
+	TotalReferralDeduction     float64 `json:"total_referral_offer_deduction"`
 	TotalAmountAfterDeduction  float64 `json:"total_amount_after_deduction"`
 }

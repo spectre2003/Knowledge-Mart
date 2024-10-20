@@ -36,7 +36,7 @@ func RegisterRoutes(router *gin.Engine) {
 	router.POST("/seller_login", controllers.SellerLogin)
 
 	//products
-	router.GET("/All_Products", controllers.ListAllProduct)
+	router.GET("/all_products", controllers.ListAllProduct)
 	router.GET("/all_category", controllers.ListAllCategory)
 	router.GET("/product_category", controllers.ListCategoryProductList)
 	router.GET("/product_price_lowtohigh", controllers.SearchProductLtoH)
@@ -89,6 +89,9 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/whishlist_view", controllers.ListAllWhishList)
 		userRoutes.DELETE("/remove_whishlist", controllers.RemoveItemFromwhishlist)
 
+		//wallet history
+		userRoutes.GET("/wallet/history", controllers.GetUserWalletHistory)
+
 		// userRoutes.GET("/payment_method", controllers.RenderRazorpay)
 		// userRoutes.POST("/create-order", controllers.CreateOrder)
 		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
@@ -122,6 +125,11 @@ func RegisterRoutes(router *gin.Engine) {
 
 		//sales report
 		sellerRoutes.GET("/report/all", controllers.SellerOverAllSalesReport)
+		sellerRoutes.GET("/report/download/pdf", controllers.DownloadSalesReportPDF)
+		sellerRoutes.GET("/report/download/excel", controllers.DownloadSalesReportExcel)
+
+		//wallet history
+		//sellerRoutes.GET("/wallet/history", controllers.GetSellerWalletHistory)
 	}
 
 	adminRoutes := router.Group("/admin")
