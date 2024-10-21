@@ -129,7 +129,7 @@ func RegisterRoutes(router *gin.Engine) {
 		sellerRoutes.GET("/report/download/excel", controllers.DownloadSalesReportExcel)
 
 		//wallet history
-		//sellerRoutes.GET("/wallet/history", controllers.GetSellerWalletHistory)
+		sellerRoutes.GET("/wallet/history", controllers.GetSellerWalletHistory)
 	}
 
 	adminRoutes := router.Group("/admin")

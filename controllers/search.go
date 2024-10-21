@@ -11,7 +11,15 @@ import (
 func SearchProductLtoH(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("offer_amount ASC").Find(&products)
+	categoryID := c.Query("category_id")
+
+	query := database.DB.Where("availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	}
+
+	tx := query.Order("offer_amount ASC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -57,7 +65,15 @@ func SearchProductLtoH(c *gin.Context) {
 func SearchProductHtoL(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("offer_amount DESC").Find(&products)
+	categoryID := c.Query("category_id")
+
+	query := database.DB.Where("availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	}
+
+	tx := query.Order("offer_amount DESC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -103,7 +119,15 @@ func SearchProductHtoL(c *gin.Context) {
 func SearchProductNew(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("products.created_at DESC").Find(&products)
+	categoryID := c.Query("category_id")
+
+	query := database.DB.Where("availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	}
+
+	tx := query.Order("products.created_at DESC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -149,7 +173,15 @@ func SearchProductNew(c *gin.Context) {
 func SearchProductAtoZ(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("LOWER(products.name) ASC").Find(&products)
+	categoryID := c.Query("category_id")
+
+	query := database.DB.Where("availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	}
+
+	tx := query.Order("LOWER(products.name) ASC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -195,7 +227,15 @@ func SearchProductAtoZ(c *gin.Context) {
 func SearchProductZtoA(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.Where("availability = ?", true).Order("LOWER(products.name) DESC").Find(&products)
+	categoryID := c.Query("category_id")
+
+	query := database.DB.Where("availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	}
+
+	tx := query.Order("LOWER(products.name) DESC").Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -241,11 +281,17 @@ func SearchProductZtoA(c *gin.Context) {
 func SearchProductHighRatedFirst(c *gin.Context) {
 	var products []models.Product
 
-	tx := database.DB.
+	categoryID := c.Query("category_id")
+
+	query := database.DB.
 		Joins("JOIN sellers ON sellers.id = products.seller_id").
-		Where("products.availability = ?", true).
-		Order("sellers.average_rating DESC").
-		Find(&products)
+		Where("products.availability = ?", true)
+
+	if categoryID != "" {
+		query = query.Where("products.category_id = ?", categoryID)
+	}
+
+	tx := query.Order("sellers.average_rating DESC").Find(&products)
 
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{

@@ -43,7 +43,7 @@ func AddMoneyToSellerWallet(OrderID string) bool {
 		OrderID:         order.OrderID,
 		SellerID:        order.SellerID,
 		Amount:          finalAmount,
-		CurrentBalance:  seller.WalletAmount,
+		CurrentBalance:  RoundDecimalValue(seller.WalletAmount),
 		Reason:          "Order Payment",
 	}
 
@@ -377,7 +377,7 @@ func GetSellerWalletHistory(c *gin.Context) {
 		return
 	}
 	var walletHistory []models.SellerWallet
-	if err := database.DB.Where("user_id = ?", uint(sellerIDUint)).Order("transaction_time desc").Find(&walletHistory).Error; err != nil {
+	if err := database.DB.Where("seller_id = ?", uint(sellerIDUint)).Order("transaction_time desc").Find(&walletHistory).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"status": "failed",

@@ -102,6 +102,7 @@ type Order struct {
 	CouponCode             string          `json:"coupon_code"`
 	CouponDiscountAmount   float64         `validate:"required,number" json:"coupon_discount_amount"`
 	ReferralDiscountAmount float64         `validate:"required,number" json:"referral_discount_amount"`
+	CategoryDiscountAmount float64         `validate:"required,number" json:"category_discount_amount"`
 	TotalAmount            float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
 	FinalAmount            float64         `validate:"required,number" json:"final_amount"`
 	PaymentMethod          string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
@@ -178,7 +179,7 @@ type SellerWallet struct {
 	TransactionTime time.Time `gorm:"autoCreateTime" json:"transaction_time"`
 	Type            string    `gorm:"column:type" json:"type"` //incoming //outgoing
 	OrderID         uint      `gorm:"column:order_id" json:"order_id"`
-	SellerID        uint      `gorm:"column:restaurant_id" json:"restaurant_id"`
+	SellerID        uint      `gorm:"column:seller_id" json:"seller_id"`
 	Amount          float64   `gorm:"column:amount" json:"amount"`
 	CurrentBalance  float64   `gorm:"column:current_balance" json:"current_balance"`
 	Reason          string    `gorm:"column:reason" json:"reason"`

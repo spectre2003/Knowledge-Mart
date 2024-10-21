@@ -171,7 +171,7 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 	for _, order := range orders {
 		AccountInformation.TotalCouponDeduction += RoundDecimalValue(order.CouponDiscountAmount)
 		AccountInformation.TotalReferralDeduction += RoundDecimalValue(order.ReferralDiscountAmount)
-		//	AccountInformation.TotalProductOfferDeduction += RoundDecimalValue(order.)
+		AccountInformation.TotalCategoryOfferDeduction += RoundDecimalValue(order.CategoryDiscountAmount)
 		AccountInformation.TotalAmountBeforeDeduction += RoundDecimalValue(order.TotalAmount)
 		AccountInformation.TotalAmountAfterDeduction += RoundDecimalValue(order.FinalAmount)
 
@@ -207,55 +207,6 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 	}, AccountInformation, nil
 }
 
-func GenerateSalesReportPDF(orderCount models.OrderCount, amountInfo models.AmountInformation) ([]byte, error) {
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf.AddPage()
-
-	pdf.SetFont("Arial", "B", 16)
-	pdf.Cell(40, 10, "Sales Report")
-
-	pdf.Ln(12)
-
-	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(40, 10, "Total Orders: "+strconv.Itoa(int(orderCount.TotalOrder)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Amount Before Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalAmountBeforeDeduction))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Coupon Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalCouponDeduction))
-	pdf.Ln(10)
-	// pdf.Cell(40, 10, "Total Product Offer Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalProductOfferDeduction))
-	// pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Referral Offer Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalReferralDeduction))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Amount After Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
-	pdf.Ln(12)
-
-	pdf.SetFont("Arial", "B", 14)
-	pdf.Cell(40, 10, "Order Status Summary")
-	pdf.Ln(10)
-
-	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(40, 10, "Total Pending Orders: "+strconv.Itoa(int(orderCount.TotalPending)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Confirmed Orders: "+strconv.Itoa(int(orderCount.TotalConfirmed)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Shipped Orders: "+strconv.Itoa(int(orderCount.TotalShipped)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Delivered Orders: "+strconv.Itoa(int(orderCount.TotalDelivered)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Cancelled Orders: "+strconv.Itoa(int(orderCount.TotalCancelled)))
-	pdf.Ln(10)
-	pdf.Cell(40, 10, "Total Returned Orders: "+strconv.Itoa(int(orderCount.TotalReturned)))
-
-	var buf bytes.Buffer
-	err := pdf.Output(&buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
 func DownloadSalesReportPDF(c *gin.Context) {
 
 	sellerID, exists := c.Get("sellerID")
@@ -268,6 +219,47 @@ func DownloadSalesReportPDF(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 	paymentStatus := c.Query("payment_status")
+	limit := c.Query("limit")
+
+	if limit == "" && (startDate == "" || endDate == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "please provide either limit or start_date and end_date"})
+		return
+	}
+
+	if limit != "" {
+		limits := []string{"day", "week", "month", "year"}
+		found := false
+		for _, l := range limits {
+			if limit == l {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit specified, valid options are: day, week, month, year"})
+			return
+		}
+
+		switch limit {
+		case "day":
+			startDate = time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+			endDate = time.Now().Format("2006-01-02")
+		case "week":
+			today := time.Now()
+			startDate = today.AddDate(0, 0, -int(today.Weekday())).Format("2006-01-02")
+			endDate = today.AddDate(0, 0, 7-int(today.Weekday())).Format("2006-01-02")
+		case "month":
+			today := time.Now()
+			firstDayOfMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+			lastDayOfMonth := firstDayOfMonth.AddDate(0, 1, -1)
+			startDate = firstDayOfMonth.Format("2006-01-02")
+			endDate = lastDayOfMonth.Format("2006-01-02")
+		case "year":
+			startDate = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+			endDate = time.Now().Format("2006-01-02")
+		}
+	}
 
 	orderCount, amountInfo, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
 	if err != nil {
@@ -275,7 +267,7 @@ func DownloadSalesReportPDF(c *gin.Context) {
 		return
 	}
 
-	pdfBytes, err := GenerateSalesReportPDF(orderCount, amountInfo)
+	pdfBytes, err := GenerateSalesReportPDF(orderCount, amountInfo, startDate, endDate, paymentStatus)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
 		return
@@ -286,8 +278,79 @@ func DownloadSalesReportPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
-func DownloadSalesReportExcel(c *gin.Context) {
+func GenerateSalesReportPDF(orderCount models.OrderCount, amountInfo models.AmountInformation, startDate string, endDate string, paymentStatus string) ([]byte, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
 
+	// Title
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(40, 10, "Sales Report")
+
+	pdf.Ln(12)
+
+	// Add Date Range and Payment Status
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(40, 10, "Start Date: "+startDate)
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "End Date: "+endDate)
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Payment Status: "+paymentStatus)
+	pdf.Ln(12)
+
+	// Display Total Amount and Deductions
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(40, 10, "Total Orders: "+strconv.Itoa(int(orderCount.TotalOrder)))
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Total Amount Before Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalAmountBeforeDeduction))
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Total Coupon Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalCouponDeduction))
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Total Category Offer Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalCategoryOfferDeduction))
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Total Referral Offer Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalReferralDeduction))
+	pdf.Ln(8)
+	pdf.Cell(40, 10, "Total Amount After Deduction: "+fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
+	pdf.Ln(12)
+
+	// Order Status Summary Title
+	pdf.SetFont("Arial", "B", 14)
+	pdf.Cell(40, 10, "Order Status Summary")
+	pdf.Ln(10)
+
+	// Create Table for Order Status Summary
+	pdf.SetFont("Arial", "B", 12)
+	pdf.CellFormat(60, 10, "Order Status", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(40, 10, "Total Count", "1", 0, "C", false, 0, "")
+	pdf.Ln(-1)
+
+	pdf.SetFont("Arial", "", 12)
+
+	// Display each order status in the table format
+	orderStatuses := map[string]uint{
+		"Pending Orders":   orderCount.TotalPending,
+		"Confirmed Orders": orderCount.TotalConfirmed,
+		"Shipped Orders":   orderCount.TotalShipped,
+		"Delivered Orders": orderCount.TotalDelivered,
+		"Cancelled Orders": orderCount.TotalCancelled,
+		"Returned Orders":  orderCount.TotalReturned,
+	}
+
+	for status, count := range orderStatuses {
+		pdf.CellFormat(60, 10, status, "1", 0, "L", false, 0, "")
+		pdf.CellFormat(40, 10, strconv.Itoa(int(count)), "1", 0, "C", false, 0, "")
+		pdf.Ln(-1)
+	}
+
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func DownloadSalesReportExcel(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "failed", "message": "seller not authorized"})
@@ -298,6 +361,47 @@ func DownloadSalesReportExcel(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 	paymentStatus := c.Query("payment_status")
+	limit := c.Query("limit")
+
+	if limit == "" && (startDate == "" || endDate == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "please provide either limit or start_date and end_date"})
+		return
+	}
+
+	if limit != "" {
+		limits := []string{"day", "week", "month", "year"}
+		found := false
+		for _, l := range limits {
+			if limit == l {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit specified, valid options are: day, week, month, year"})
+			return
+		}
+
+		switch limit {
+		case "day":
+			startDate = time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+			endDate = time.Now().Format("2006-01-02")
+		case "week":
+			today := time.Now()
+			startDate = today.AddDate(0, 0, -int(today.Weekday())).Format("2006-01-02")
+			endDate = today.AddDate(0, 0, 7-int(today.Weekday())).Format("2006-01-02")
+		case "month":
+			today := time.Now()
+			firstDayOfMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+			lastDayOfMonth := firstDayOfMonth.AddDate(0, 1, -1)
+			startDate = firstDayOfMonth.Format("2006-01-02")
+			endDate = lastDayOfMonth.Format("2006-01-02")
+		case "year":
+			startDate = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+			endDate = time.Now().Format("2006-01-02")
+		}
+	}
 
 	orderCount, amountInfo, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
 	if err != nil {
@@ -305,52 +409,72 @@ func DownloadSalesReportExcel(c *gin.Context) {
 		return
 	}
 
-	excelBytes, err := GenerateSalesReportExcel(orderCount, amountInfo)
+	excelBytes, err := GenerateSalesReportExcel(orderCount, amountInfo, startDate, endDate, paymentStatus)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel report"})
 		return
 	}
 
-	// Set the response headers for Excel download
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=sales_report.xlsx")
+	c.Header("Content-Length", strconv.Itoa(len(excelBytes))) // Ensure Content-Length is added
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelBytes)
 }
 
-func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.AmountInformation) ([]byte, error) {
+func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.AmountInformation, startDate, endDate, paymentStatus string) ([]byte, error) {
 	f := excelize.NewFile()
 
-	// Create headers
+	// Adding Sales Report title
 	f.SetCellValue("Sheet1", "A1", "Sales Report")
-	f.SetCellValue("Sheet1", "A3", "Total Orders")
-	f.SetCellValue("Sheet1", "B3", strconv.Itoa(int(orderCount.TotalOrder)))
 
-	// Add Amount Information
-	f.SetCellValue("Sheet1", "A4", "Total Amount Before Deduction")
-	f.SetCellValue("Sheet1", "B4", fmt.Sprintf("%.2f", amountInfo.TotalAmountBeforeDeduction))
-	f.SetCellValue("Sheet1", "A5", "Total Coupon Deduction")
-	f.SetCellValue("Sheet1", "B5", fmt.Sprintf("%.2f", amountInfo.TotalCouponDeduction))
-	f.SetCellValue("Sheet1", "A6", "Total Referral Offer Deduction")
-	f.SetCellValue("Sheet1", "B6", fmt.Sprintf("%.2f", amountInfo.TotalReferralDeduction))
-	f.SetCellValue("Sheet1", "A7", "Total Amount After Deduction")
-	f.SetCellValue("Sheet1", "B7", fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
+	// Adding Start Date, End Date, and Payment Status
+	f.SetCellValue("Sheet1", "A2", "Start Date")
+	f.SetCellValue("Sheet1", "B2", startDate)
+	f.SetCellValue("Sheet1", "A3", "End Date")
+	f.SetCellValue("Sheet1", "B3", endDate)
+	f.SetCellValue("Sheet1", "A4", "Payment Status")
+	f.SetCellValue("Sheet1", "B4", paymentStatus)
 
-	// Add Order Status Summary
-	f.SetCellValue("Sheet1", "A9", "Order Status Summary")
-	f.SetCellValue("Sheet1", "A10", "Total Pending Orders")
-	f.SetCellValue("Sheet1", "B10", strconv.Itoa(int(orderCount.TotalPending)))
-	f.SetCellValue("Sheet1", "A11", "Total Confirmed Orders")
-	f.SetCellValue("Sheet1", "B11", strconv.Itoa(int(orderCount.TotalConfirmed)))
-	f.SetCellValue("Sheet1", "A12", "Total Shipped Orders")
-	f.SetCellValue("Sheet1", "B12", strconv.Itoa(int(orderCount.TotalShipped)))
-	f.SetCellValue("Sheet1", "A13", "Total Delivered Orders")
-	f.SetCellValue("Sheet1", "B13", strconv.Itoa(int(orderCount.TotalDelivered)))
-	f.SetCellValue("Sheet1", "A14", "Total Cancelled Orders")
-	f.SetCellValue("Sheet1", "B14", strconv.Itoa(int(orderCount.TotalCancelled)))
-	f.SetCellValue("Sheet1", "A15", "Total Returned Orders")
-	f.SetCellValue("Sheet1", "B15", strconv.Itoa(int(orderCount.TotalReturned)))
+	// Adding Total Orders and Amount Information
+	f.SetCellValue("Sheet1", "A6", "Total Orders")
+	f.SetCellValue("Sheet1", "B6", strconv.Itoa(int(orderCount.TotalOrder)))
 
-	// Write the Excel file to a buffer
+	f.SetCellValue("Sheet1", "A7", "Total Amount Before Deduction")
+	f.SetCellValue("Sheet1", "B7", fmt.Sprintf("%.2f", amountInfo.TotalAmountBeforeDeduction))
+
+	f.SetCellValue("Sheet1", "A8", "Total Coupon Deduction")
+	f.SetCellValue("Sheet1", "B8", fmt.Sprintf("%.2f", amountInfo.TotalCouponDeduction))
+
+	f.SetCellValue("Sheet1", "A9", "Total Category Offer Deduction")
+	f.SetCellValue("Sheet1", "B9", fmt.Sprintf("%.2f", amountInfo.TotalCategoryOfferDeduction))
+
+	f.SetCellValue("Sheet1", "A10", "Total Referral Offer Deduction")
+	f.SetCellValue("Sheet1", "B10", fmt.Sprintf("%.2f", amountInfo.TotalReferralDeduction))
+
+	f.SetCellValue("Sheet1", "A11", "Total Amount After Deduction")
+	f.SetCellValue("Sheet1", "B11", fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
+
+	// Adding Order Status Summary
+	f.SetCellValue("Sheet1", "A13", "Order Status Summary")
+	f.SetCellValue("Sheet1", "A14", "Total Pending Orders")
+	f.SetCellValue("Sheet1", "B14", strconv.Itoa(int(orderCount.TotalPending)))
+
+	f.SetCellValue("Sheet1", "A15", "Total Confirmed Orders")
+	f.SetCellValue("Sheet1", "B15", strconv.Itoa(int(orderCount.TotalConfirmed)))
+
+	f.SetCellValue("Sheet1", "A16", "Total Shipped Orders")
+	f.SetCellValue("Sheet1", "B16", strconv.Itoa(int(orderCount.TotalShipped)))
+
+	f.SetCellValue("Sheet1", "A17", "Total Delivered Orders")
+	f.SetCellValue("Sheet1", "B17", strconv.Itoa(int(orderCount.TotalDelivered)))
+
+	f.SetCellValue("Sheet1", "A18", "Total Cancelled Orders")
+	f.SetCellValue("Sheet1", "B18", strconv.Itoa(int(orderCount.TotalCancelled)))
+
+	f.SetCellValue("Sheet1", "A19", "Total Returned Orders")
+	f.SetCellValue("Sheet1", "B19", strconv.Itoa(int(orderCount.TotalReturned)))
+
+	// Writing data to buffer
 	var buf bytes.Buffer
 	if err := f.Write(&buf); err != nil {
 		return nil, err

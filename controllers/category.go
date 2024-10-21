@@ -53,6 +53,15 @@ func ListCategoryProductList(c *gin.Context) {
 		return
 	}
 
+	var category models.Category
+	if err := database.DB.Where("id = ?", catid).First(&category).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to retrieve category information",
+		})
+		return
+	}
+
 	var products []models.Product
 	tx := database.DB.Select("*").Where("category_id = ? AND availability = ?", catid, true).Find(&products)
 
@@ -64,7 +73,10 @@ func ListCategoryProductList(c *gin.Context) {
 		return
 	}
 
-	var productResponse []models.ProductResponse
+	var productResponse []models.ProductCategoryResponse
+
+	var TotalAmount float64
+	var finalAmount float64
 
 	for _, product := range products {
 		var seller models.Seller
@@ -75,11 +87,18 @@ func ListCategoryProductList(c *gin.Context) {
 			})
 			return
 		}
-		productResponse = append(productResponse, models.ProductResponse{
+
+		discountedPrice := calculateFinalAmount(product.Price, product.OfferAmount, category.OfferPercentage)
+
+		TotalAmount += product.OfferAmount
+		finalAmount += discountedPrice
+
+		productResponse = append(productResponse, models.ProductCategoryResponse{
 			ID:           product.ID,
 			Name:         product.Name,
 			Price:        product.Price,
 			OfferAmount:  product.OfferAmount,
+			FinalAmount:  finalAmount,
 			Description:  product.Description,
 			Image:        product.Image,
 			Availability: product.Availability,
@@ -93,7 +112,8 @@ func ListCategoryProductList(c *gin.Context) {
 		"status":  "success",
 		"message": "successfully retrieved products for category",
 		"data": gin.H{
-			"products": productResponse,
+			"category_percentage": category.OfferPercentage,
+			"products":            productResponse,
 		},
 	})
 }

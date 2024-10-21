@@ -8,11 +8,26 @@ import (
 )
 
 type ProductResponse struct {
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	OfferAmount float64 `json:"offer_amount"`
+	//FinalAmount  float64        `json:"final_amount"`
+	Image        pq.StringArray `json:"image_url"`
+	Availability bool           `json:"availability"`
+	SellerID     uint           `json:"sellerid"`
+	CategoryID   uint           `json:"categoryid"`
+	SellerRating float64        `json:"sellerRating"`
+}
+
+type ProductCategoryResponse struct {
 	ID           uint           `json:"id"`
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
 	Price        float64        `json:"price"`
 	OfferAmount  float64        `json:"offer_amount"`
+	FinalAmount  float64        `json:"final_amount"`
 	Image        pq.StringArray `json:"image_url"`
 	Availability bool           `json:"availability"`
 	SellerID     uint           `json:"sellerid"`
@@ -95,26 +110,16 @@ type CartResponse struct {
 }
 
 type GetSellerOrdersResponse struct {
-	OrderID         uint            `json:"orderId"`
-	UserID          uint            `json:"userId"`
-	SellerID        uint            `json:"sellerId"`
-	PaymentMethod   string          `json:"paymentMethod"`
-	PaymentStatus   string          `json:"paymentStatus"`
-	OrderStatus     string          `json:"orderStatus"`
-	TotalAmount     float64         `json:"totalAmount"`
-	FinalAmount     float64         `json:"finalAmount"`
-	Product         []ProductArray  `json:"products"`
-	ShippingAddress ShippingAddress `json:"shippingAddress"`
-}
-
-type ProductArray struct {
-	ProductID   uint           `json:"productId"`
-	ProductName string         `json:"productName"`
-	Description string         `json:"description"`
-	Image       pq.StringArray `json:"image_url"`
-	Price       float64        `json:"price"`
-	OfferAmount float64        `json:"offer_amount"`
-	OrderItemID uint           `json:"orderItemId"`
+	OrderID         uint                `json:"orderId"`
+	UserID          uint                `json:"userId"`
+	SellerID        uint                `json:"sellerId"`
+	PaymentMethod   string              `json:"paymentMethod"`
+	PaymentStatus   string              `json:"paymentStatus"`
+	OrderStatus     string              `json:"orderStatus"`
+	TotalAmount     float64             `json:"totalAmount"`
+	FinalAmount     float64             `json:"finalAmount"`
+	Product         []OrderItemResponse `json:"products"`
+	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 }
 
 type GetSellerOrderStatusResponse struct {
@@ -145,8 +150,8 @@ type OrderItemResponse struct {
 	CategoryID  uint           `json:"categoryId"`
 	Description string         `json:"description"`
 	Price       float64        `json:"price"`
-	SellerName  string         `json:"sellerName"`
-	OrderStatus string         `json:"orderStatus"`
+	//SellerName  string         `json:"sellerName"`
+	OrderStatus string `json:"orderStatus"`
 }
 
 type SellerOverallSalesReport struct {
@@ -167,9 +172,9 @@ type OrderCount struct {
 }
 
 type AmountInformation struct {
-	TotalCouponDeduction float64 `json:"total_coupon_deduction"`
-	//TotalProductOfferDeduction float64 `json:"total_product_offer_deduction"`
-	TotalAmountBeforeDeduction float64 `json:"total_amount_before_deduction"`
-	TotalReferralDeduction     float64 `json:"total_referral_offer_deduction"`
-	TotalAmountAfterDeduction  float64 `json:"total_amount_after_deduction"`
+	TotalCouponDeduction        float64 `json:"total_coupon_deduction"`
+	TotalCategoryOfferDeduction float64 `json:"total_category_offer_deduction"`
+	TotalAmountBeforeDeduction  float64 `json:"total_amount_before_deduction"`
+	TotalReferralDeduction      float64 `json:"total_referral_offer_deduction"`
+	TotalAmountAfterDeduction   float64 `json:"total_amount_after_deduction"`
 }

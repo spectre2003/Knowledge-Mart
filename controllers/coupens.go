@@ -405,18 +405,15 @@ func ApplyCouponOnCart(c *gin.Context) {
 }
 
 func ApplyCouponToOrder(TotalAmount float64, UserID uint, CouponCode string) (bool, string, float64) {
-	// Find the coupon by code
 	var coupon models.CouponInventory
 	if err := database.DB.Where("coupon_code = ?", CouponCode).First(&coupon).Error; err != nil {
 		return false, "coupon not found", 0
 	}
 
-	// Check for coupon expiration
 	if time.Now().Unix() > int64(coupon.Expiry) {
 		return false, "coupon has expired", 0
 	}
 
-	// Check coupon usage by the user
 	var couponUsage models.CouponUsage
 	err := database.DB.Where("coupon_code = ? AND user_id = ?", CouponCode, UserID).First(&couponUsage).Error
 	if err == nil && couponUsage.UsageCount >= coupon.MaximumUsage {
@@ -425,18 +422,14 @@ func ApplyCouponToOrder(TotalAmount float64, UserID uint, CouponCode string) (bo
 		return false, "database error", 0
 	}
 
-	// Check if order qualifies for the coupon (minimum order amount)
 	if TotalAmount < coupon.MinimumAmount {
 		errMsg := fmt.Sprintf("minimum of %v is needed for using this coupon", coupon.MinimumAmount)
 		return false, errMsg, 0
 	}
 
-	// Calculate discount
 	discountAmount := TotalAmount * float64(coupon.Percentage) / 100
 
-	// Update or create the coupon usage record
 	if err == gorm.ErrRecordNotFound {
-		// Create a new coupon usage record
 		couponUsage = models.CouponUsage{
 			UserID:     UserID,
 			CouponCode: CouponCode,
@@ -446,7 +439,6 @@ func ApplyCouponToOrder(TotalAmount float64, UserID uint, CouponCode string) (bo
 			return false, "failed to create coupon usage record", 0
 		}
 	} else {
-		// Update the coupon usage count
 		couponUsage.UsageCount++
 		if err := database.DB.Where("user_id = ? AND coupon_code = ?", UserID, CouponCode).Save(&couponUsage).Error; err != nil {
 			return false, "failed to update coupon usage record", 0
@@ -468,6 +460,5 @@ func CheckCouponExists(code string) bool {
 			return true
 		}
 	}
-
 	return false
 }
