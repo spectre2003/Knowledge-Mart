@@ -762,6 +762,19 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
+	if orders.PaymentStatus == models.PaymentStatusPaid {
+		fmt.Println("refund is starting")
+		err := RefundToUser(tx, id, orderId, orders.FinalAmount, "Entire order canceled", isSeller)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "failed to refund amount " + err.Error(),
+			})
+			return
+		}
+	}
+
 	orders.Status = models.OrderStatusCanceled
 	orders.PaymentStatus = models.PaymentStatusCanceled
 
@@ -785,18 +798,6 @@ func CancelOrder(c *gin.Context) {
 			"message": "order items not found for this order",
 		})
 		return
-	}
-
-	if orders.PaymentStatus == models.PaymentStatusPaid {
-		err := RefundToUser(tx, id, orderId, orders.FinalAmount, "Entire order canceled", isSeller)
-		if err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to refund amount " + err.Error(),
-			})
-			return
-		}
 	}
 
 	for _, orderItem := range orderItems {

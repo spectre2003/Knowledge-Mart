@@ -41,7 +41,7 @@ var googleOauthConfig = &oauth2.Config{
 }
 
 func GoogleHandleLogin(c *gin.Context) {
-	state := "hjdfyuhadVFYU6781235"
+	state := "nadbfyuhadVFYU6781235"
 	url := googleOauthConfig.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	c.Next()
@@ -117,9 +117,8 @@ func GoogleHandleCallback(c *gin.Context) {
 				})
 				return
 			}
-			existingUser = newUser // Assign the newly created user to existingUser for later token generation
+			existingUser = newUser
 		} else {
-			// Some other error occurred
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
 				"message": "failed to fetch user from database",
@@ -128,7 +127,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		}
 	}
 
-	// Check if the user is blocked or needs to login with another method
 	if existingUser.Blocked {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "failed",

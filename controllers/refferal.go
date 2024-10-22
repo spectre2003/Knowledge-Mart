@@ -137,12 +137,22 @@ func ApplyReferralOnCart(c *gin.Context) {
 
 func ApplyReferral(totalAmount float64, userID uint, refCode string) (bool, string, float64) {
 	var userReferralHistory models.UserReferralHistory
+
 	if err := database.DB.Where("user_id = ?", userID).First(&userReferralHistory).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, "database error occurred while checking referral history", 0
 		}
 	} else {
-		return false, "user already used referral", 0
+		return false, "user has already used a referral", 0
+	}
+
+	var currentUser models.User
+	if err := database.DB.Where("id = ?", userID).First(&currentUser).Error; err != nil {
+		return false, "error retrieving current user", 0
+	}
+
+	if currentUser.ReferralCode == refCode {
+		return false, "cannot use your own referral code", 0
 	}
 
 	var referredByUser models.User
