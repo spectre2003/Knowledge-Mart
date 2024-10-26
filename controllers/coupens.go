@@ -5,6 +5,7 @@ import (
 	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"knowledgeMart/utils"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,13 +52,13 @@ func CreateCoupen(c *gin.Context) {
 		return
 	}
 
-	if CheckCouponExists(Request.CouponCode) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "failed",
-			"message": "coupon code already exists",
-		})
-		return
-	}
+	// if CheckCouponExists(Request.CouponCode) {
+	// 	c.JSON(http.StatusBadRequest, gin.H{
+	// 		"status":  "failed",
+	// 		"message": "coupon code already exists",
+	// 	})
+	// 	return
+	// }
 
 	if Request.Percentage > 50 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -78,12 +79,15 @@ func CreateCoupen(c *gin.Context) {
 		return
 	}
 
+	couponCode := utils.GenerateRandomString(6)
+
 	Coupon := models.CouponInventory{
-		CouponCode:    Request.CouponCode,
-		Expiry:        expiryTimestamp,
-		Percentage:    Request.Percentage,
-		MaximumUsage:  Request.MaximumUsage,
-		MinimumAmount: float64(Request.MinimumAmount),
+		CouponCode:            couponCode,
+		Expiry:                expiryTimestamp,
+		Percentage:            Request.Percentage,
+		MaximumUsage:          Request.MaximumUsage,
+		MinimumAmount:         float64(Request.MinimumAmount),
+		MaximumDiscountAmount: float64(Request.MaximumDiscountAmount),
 	}
 
 	if err := database.DB.Create(&Coupon).Error; err != nil {
@@ -119,7 +123,7 @@ func UpdateCoupon(c *gin.Context) {
 		return
 	}
 
-	var Request models.CouponInventoryRequest
+	var Request models.UpdateCouponInventoryRequest
 	if err := c.BindJSON(&Request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
@@ -169,6 +173,8 @@ func UpdateCoupon(c *gin.Context) {
 	existingCoupon.Expiry = newExpiryTime
 	existingCoupon.Percentage = Request.Percentage
 	existingCoupon.MaximumUsage = Request.MaximumUsage
+	existingCoupon.MinimumAmount = float64(Request.MinimumAmount)
+	existingCoupon.MaximumDiscountAmount = float64(Request.MaximumDiscountAmount)
 
 	if err := database.DB.Save(&existingCoupon).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -370,7 +376,6 @@ func ApplyCouponOnCart(c *gin.Context) {
 		usageErr := database.DB.Where("user_id = ? AND coupon_code = ?", UserIDStr, CouponCode).First(&usage).Error
 
 		if usageErr != nil && !errors.Is(usageErr, gorm.ErrRecordNotFound) {
-			// Any error other than "record not found" is an issue
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
 				"message": "Error checking coupon usage. Please try again later.",
@@ -379,7 +384,6 @@ func ApplyCouponOnCart(c *gin.Context) {
 		}
 
 		if usageErr == nil {
-			// If a record exists, it means the user has already used the coupon
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "failed",
 				"message": "The coupon usage limit has been reached.",
@@ -388,6 +392,10 @@ func ApplyCouponOnCart(c *gin.Context) {
 		}
 
 		couponDiscount = float64(sum) * (float64(coupon.Percentage) / 100.0)
+
+		if couponDiscount > coupon.MaximumDiscountAmount {
+			couponDiscount = coupon.MaximumDiscountAmount
+		}
 		finalAmount = sum - couponDiscount
 	}
 
@@ -428,6 +436,10 @@ func ApplyCouponToOrder(TotalAmount float64, UserID uint, CouponCode string) (bo
 	}
 
 	discountAmount := TotalAmount * float64(coupon.Percentage) / 100
+
+	if discountAmount > coupon.MaximumDiscountAmount {
+		discountAmount = coupon.MaximumDiscountAmount
+	}
 
 	if err == gorm.ErrRecordNotFound {
 		couponUsage = models.CouponUsage{

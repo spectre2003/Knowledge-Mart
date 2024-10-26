@@ -186,11 +186,12 @@ type SellerWallet struct {
 }
 
 type CouponInventory struct {
-	CouponCode    string  `validate:"required" json:"coupon_code" gorm:"primary_key"`
-	Expiry        int64   `validate:"required" json:"expiry"`
-	Percentage    uint    `validate:"required" json:"percentage"`
-	MaximumUsage  uint    `validate:"required" json:"maximum_usage"`
-	MinimumAmount float64 `validate:"required" json:"minimum_amount"`
+	CouponCode            string  `validate:"required" json:"coupon_code" gorm:"primary_key"`
+	Expiry                int64   `validate:"required" json:"expiry"`
+	Percentage            uint    `validate:"required" json:"percentage"`
+	MaximumUsage          uint    `validate:"required" json:"maximum_usage"`
+	MinimumAmount         float64 `validate:"required" json:"minimum_amount"`
+	MaximumDiscountAmount float64 `validate:"required" json:"maximum_amount"`
 }
 
 type CouponUsage struct {

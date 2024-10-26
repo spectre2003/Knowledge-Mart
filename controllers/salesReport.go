@@ -6,6 +6,7 @@ import (
 	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -481,4 +482,166 @@ func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.Am
 	}
 
 	return buf.Bytes(), nil
+}
+
+func OrderInvoice(c *gin.Context) {
+	orderID := c.Query("order_id")
+
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "order id is required",
+		})
+		return
+	}
+
+	var order models.Order
+	if err := database.DB.Where("order_id = ?", orderID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch order information",
+		})
+		return
+	}
+
+	var orderItem []models.OrderItem
+	if err := database.DB.Preload("Product").Where("order_id = ?", orderID).Find(&orderItem).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch order item information",
+		})
+		return
+	}
+
+	var payment models.Payment
+	if err := database.DB.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch payment information",
+		})
+		return
+	}
+
+	var user models.User
+	if err := database.DB.Where("id = ?", order.UserID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "failed",
+			"message": "failed to fetch user information",
+		})
+		return
+	}
+
+	address := order.ShippingAddress
+
+	pdfBytes, err := GeneratePDFInvoice(order, orderItem, user, address, payment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  false,
+			"message": "failed to generate PDF",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Serve the PDF
+	c.Writer.Header().Set("Content-type", "application/pdf")
+	c.Writer.Header().Set("Content-Disposition", "inline; filename=invoice.pdf")
+	c.Writer.Write(pdfBytes)
+}
+
+func GeneratePDFInvoice(order models.Order, orderItems []models.OrderItem, user models.User, billingAddress models.ShippingAddress, payment models.Payment) ([]byte, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+
+	// Set proper font
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(190, 10, "Tax Invoice")
+	pdf.Ln(12)
+
+	// Seller Information
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(190, 6, "Sold By: KNOWLEDGE MART")
+	pdf.Ln(6)
+	pdf.Cell(190, 6, "Ship-from Address: Sy no 18/2, Mananthavady, Kerala")
+	pdf.Ln(6)
+	pdf.Cell(190, 6, "GSTIN: 29AAECS1679J2ZT")
+	pdf.Ln(12)
+
+	// Order Information
+	pdf.Cell(190, 6, fmt.Sprintf("Order ID: %d", order.OrderID))
+	pdf.Ln(6)
+	pdf.Cell(190, 6, fmt.Sprintf("Order Date: %s", order.OrderedAt.Format("02-Jan-2006")))
+	pdf.Ln(6)
+	pdf.Cell(190, 6, fmt.Sprintf("Payment ID: %s", payment.RazorpayPaymentID))
+	pdf.Ln(6)
+	pdf.Cell(190, 6, fmt.Sprintf("Payment Method: %s", order.PaymentMethod))
+	pdf.Ln(6)
+	pdf.Cell(190, 6, fmt.Sprintf("Payment Status: %s", payment.PaymentStatus))
+	pdf.Ln(12)
+
+	// Billing and Shipping Address
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(95, 6, "Ship To:")
+	pdf.Ln(6)
+
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(95, 6, fmt.Sprintf("%s", user.Name))
+	pdf.Ln(6)
+
+	printAddress(pdf, billingAddress)
+
+	pdf.Ln(12)
+
+	// Table Header (Adjust column widths)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.CellFormat(30, 10, "Product", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(40, 10, "Title", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(25, 10, "Total Amount", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(25, 10, "Offer Amount", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(25, 10, "Coupon Amount", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(25, 10, "Referral Amount", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(25, 10, "Final Amount", "1", 0, "C", false, 0, "")
+	pdf.Ln(10)
+
+	// Table Rows (Wrap text for description and adjust column widths)
+	pdf.SetFont("Arial", "", 10)
+	for _, item := range orderItems {
+		pdf.CellFormat(30, 10, item.Product.Name, "1", 0, "C", false, 0, "")
+
+		// Use MultiCell for description to allow text wrapping
+		x, y := pdf.GetXY()
+		pdf.MultiCell(40, 6, item.Product.Description, "1", "L", false)
+		pdf.SetXY(x+40, y) // Move back to the right position after MultiCell
+
+		pdf.CellFormat(25, 10, fmt.Sprintf("%.2f", order.TotalAmount), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(25, 10, fmt.Sprintf("%.2f", item.ProductOfferAmount), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(25, 10, fmt.Sprintf("%.2f", order.CouponDiscountAmount), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(25, 10, fmt.Sprintf("%.2f", order.ReferralDiscountAmount), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(25, 10, fmt.Sprintf("%.2f", order.FinalAmount), "1", 0, "C", false, 0, "")
+		pdf.Ln(10)
+	}
+
+	// Total Amount Section
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(180, 10, fmt.Sprintf("Total Amount : %.2f", order.TotalAmount))
+	pdf.Ln(6)
+	pdf.Cell(180, 10, fmt.Sprintf("Final Amount : %.2f", order.FinalAmount))
+	pdf.Ln(10)
+
+	// Save PDF to bytes.Buffer
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
+	if err != nil {
+		log.Printf("Failed to generate PDF: %v", err)
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func printAddress(pdf *gofpdf.Fpdf, address models.ShippingAddress) {
+	pdf.Cell(95, 6, fmt.Sprintf("%s, %s", address.StreetName, address.City))
+	pdf.Ln(6)
+	pdf.Cell(95, 6, fmt.Sprintf("%s, %s, %s", address.State, address.PinCode, address.PhoneNumber))
+	pdf.Ln(6)
 }

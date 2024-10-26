@@ -90,20 +90,12 @@ func VerifyPayment(c *gin.Context) {
 	}
 
 	if err := c.BindJSON(&paymentInfo); err != nil {
-		fmt.Println("binging error")
+		fmt.Println("binding error")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment information"})
 		return
 	}
 
 	fmt.Println("Payment Info:", paymentInfo)
-
-	secret := os.Getenv("RAZORPAY_KEY_SECRET")
-
-	if !verifySignature(paymentInfo.OrderID, paymentInfo.PaymentID, paymentInfo.Signature, secret) {
-		fmt.Println("Invalid payment signature")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment signature"})
-		return
-	}
 
 	var order models.Order
 	if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
@@ -115,6 +107,15 @@ func VerifyPayment(c *gin.Context) {
 	couponDiscount := order.CouponDiscountAmount
 	referralDiscount := order.ReferralDiscountAmount
 
+	if !CartToOrderItems(order.UserID, order, couponDiscount, referralDiscount) {
+		database.DB.Delete(&order)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Failed to transfer cart items to order",
+		})
+		return
+	}
+
 	payment := models.Payment{
 		OrderID:           orderIDStr,
 		WalletPaymentID:   "",
@@ -122,56 +123,50 @@ func VerifyPayment(c *gin.Context) {
 		RazorpayPaymentID: paymentInfo.PaymentID,
 		RazorpaySignature: paymentInfo.Signature,
 		PaymentGateway:    models.Razorpay,
-		PaymentStatus:     models.PaymentStatusPaid,
-		//AmountPaid:        finalAmount,
+		PaymentStatus:     models.OnlinePaymentPending,
 	}
 
 	if err := database.DB.Model(&models.Payment{}).Create(&payment).Error; err != nil {
 		fmt.Println("Failed to create payment record:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "failed",
-			"message": "failed to create payment record: " + err.Error(),
+			"message": "Failed to create payment record: " + err.Error(),
 		})
 		return
 	}
 
-	fmt.Println("Payment record created successfully")
+	secret := os.Getenv("RAZORPAY_KEY_SECRET")
+	if verifySignature(paymentInfo.OrderID, paymentInfo.PaymentID, paymentInfo.Signature, secret) {
+		if err := database.DB.Model(&models.Order{}).
+			Where("order_id = ?", orderIDStr).
+			Updates(map[string]interface{}{
+				"payment_status": models.PaymentStatusPaid,
+				"status":         models.OrderStatusConfirmed,
+			}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "Failed to update order payment and status",
+			})
+			return
+		}
+		database.DB.Model(&models.Payment{}).
+			Where("order_id = ?", orderIDStr).
+			Update("payment_status", models.PaymentStatusPaid)
 
-	if err := database.DB.Model(&models.Order{}).
-		Where("order_id = ?", orderIDStr).
-		Updates(map[string]interface{}{
-			"payment_status": models.PaymentStatusPaid,
-			"status":         models.OrderStatusConfirmed,
-		}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to update order payment and status",
-		})
-		return
+		if !AddMoneyToSellerWallet(orderIDStr) {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "Failed to add money to seller wallet",
+			})
+			return
+		}
+
+		fmt.Println("Payment verified successfully, order confirmed")
+		c.JSON(http.StatusOK, gin.H{"status": "Payment verified successfully"})
+	} else {
+		fmt.Println("Invalid payment signature, order marked as pending")
+		c.JSON(http.StatusOK, gin.H{"status": "Payment verification failed, order marked as pending"})
 	}
-
-	fmt.Println("Order payment and status updated successfully")
-
-	if !CartToOrderItems(order.UserID, order, couponDiscount, referralDiscount) {
-		database.DB.Delete(&order)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to transfer cart items to order",
-		})
-		return
-	}
-
-	if !AddMoneyToSellerWallet(orderIDStr) {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "failed to add money to seller wallet",
-		})
-		return
-	}
-
-	fmt.Println("success")
-
-	c.JSON(http.StatusOK, gin.H{"status": "Payment verified successfully"})
 }
 
 func verifySignature(orderID, paymentID, signature, secret string) bool {

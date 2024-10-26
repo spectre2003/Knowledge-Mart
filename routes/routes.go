@@ -77,6 +77,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/my_orders", controllers.UserCheckOrderStatus)
 		userRoutes.PATCH("/order_cancel", controllers.CancelOrder)
 		userRoutes.PATCH("/order_return", controllers.ReturnOrder)
+		userRoutes.GET("/order/invoice", controllers.OrderInvoice)
 
 		//note sharing
 		userRoutes.POST("/file_upload", controllers.UploadFile)
@@ -130,6 +131,11 @@ func RegisterRoutes(router *gin.Engine) {
 
 		//wallet history
 		sellerRoutes.GET("/wallet/history", controllers.GetSellerWalletHistory)
+
+		//top selling
+		sellerRoutes.GET("/product/top-selling", controllers.TopSellingProduct)
+		sellerRoutes.GET("/category/top-selling", controllers.TopSellingCategory)
+
 	}
 
 	adminRoutes := router.Group("/admin")

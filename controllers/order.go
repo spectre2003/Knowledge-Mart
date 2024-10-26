@@ -180,6 +180,14 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	if PaymentMethodOption == models.COD && finalAmount < 100 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "COD is not applicable for order",
+		})
+		return
+	}
+
 	status := models.OrderStatusPending
 
 	if PaymentMethodOption == models.COD {

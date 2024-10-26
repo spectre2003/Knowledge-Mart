@@ -129,11 +129,21 @@ type RazorpayPayment struct {
 }
 
 type CouponInventoryRequest struct {
-	CouponCode    string `validate:"required" json:"coupon_code"`
-	Expiry        int64  `validate:"required" json:"expiry"`
-	Percentage    uint   `validate:"required" json:"percentage"`
-	MaximumUsage  uint   `validate:"required" json:"maximum_usage"`
-	MinimumAmount uint   `validate:"required" json:"minimum_amount"`
+	//CouponCode            string `validate:"required" json:"coupon_code"`
+	Expiry                int64 `validate:"required" json:"expiry"`
+	Percentage            uint  `validate:"required" json:"percentage"`
+	MaximumUsage          uint  `validate:"required" json:"maximum_usage"`
+	MinimumAmount         uint  `validate:"required" json:"minimum_amount"`
+	MaximumDiscountAmount uint  `validate:"required" json:"maximum_amount"`
+}
+
+type UpdateCouponInventoryRequest struct {
+	CouponCode            string `validate:"required" json:"coupon_code"`
+	Expiry                int64  `validate:"required" json:"expiry"`
+	Percentage            uint   `validate:"required" json:"percentage"`
+	MaximumUsage          uint   `validate:"required" json:"maximum_usage"`
+	MinimumAmount         uint   `validate:"required" json:"minimum_amount"`
+	MaximumDiscountAmount uint   `validate:"required" json:"maximum_amount"`
 }
 
 type AddOfferRequest struct {
