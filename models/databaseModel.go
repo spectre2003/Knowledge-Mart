@@ -98,18 +98,19 @@ type Cart struct {
 
 type Order struct {
 	OrderID                uint            `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID                 uint            `gorm:"not null" json:"userId"`
+	UserID                 uint            `gorm:"not null" json:"user_id"`
 	CouponCode             string          `json:"coupon_code"`
 	CouponDiscountAmount   float64         `validate:"required,number" json:"coupon_discount_amount"`
-	ReferralDiscountAmount float64         `validate:"required,number" json:"referral_discount_amount"`
 	CategoryDiscountAmount float64         `validate:"required,number" json:"category_discount_amount"`
-	TotalAmount            float64         `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	ProductOfferAmount     float64         `validate:"required,number" json:"product_offer_amount"`
+	DeliveryCharge         float64         `validate:"number" json:"delivery_charge"`
+	TotalAmount            float64         `gorm:"type:decimal(10,2);not null" json:"total_amount"`
 	FinalAmount            float64         `validate:"required,number" json:"final_amount"`
-	PaymentMethod          string          `gorm:"type:varchar(100)" validate:"required" json:"paymentMethod"`
-	PaymentStatus          string          `gorm:"type:varchar(100)" validate:"required" json:"paymentStatus"`
-	OrderedAt              time.Time       `gorm:"autoCreateTime" json:"orderedAt"`
-	ShippingAddress        ShippingAddress `gorm:"embedded" json:"shippingAddress"`
-	SellerID               uint            `gorm:"not null" json:"sellerId"`
+	PaymentMethod          string          `gorm:"type:varchar(100)" validate:"required" json:"payment_method"`
+	PaymentStatus          string          `gorm:"type:varchar(100)" validate:"required" json:"payment_status"`
+	OrderedAt              time.Time       `gorm:"autoCreateTime" json:"ordered_at"`
+	ShippingAddress        ShippingAddress `gorm:"embedded" json:"shipping_address"`
+	SellerID               uint            `gorm:"not null" json:"seller_id"`
 	Status                 string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
@@ -123,18 +124,21 @@ type ShippingAddress struct {
 }
 
 type OrderItem struct {
-	OrderItemID        uint    `gorm:"primaryKey;autoIncrement" json:"orderItemId"`
-	OrderID            uint    `gorm:"not null" json:"orderId"`
-	Order              Order   `gorm:"foreignKey:OrderID"`
-	UserID             uint    `gorm:"not null" json:"userId"`
-	User               User    `gorm:"foreignKey:UserID"`
-	ProductID          uint    `gorm:"not null" json:"productId"`
-	Product            Product `gorm:"foreignKey:ProductID"`
-	SellerID           uint    `gorm:"not null" json:"sellerId"`
-	Seller             Seller  `gorm:"foreignKey:SellerID"`
-	Price              float64 `gorm:"type:decimal(10,2);not null" json:"price"`
-	ProductOfferAmount float64 `json:"product_offer_amount" csv:"ProductOfferAmount"`
-	Status             string  `gorm:"type:varchar(100);default:'pending'" json:"status"`
+	OrderItemID         uint    `gorm:"primaryKey;autoIncrement" json:"orderItemId"`
+	OrderID             uint    `gorm:"not null" json:"orderId"`
+	Order               Order   `gorm:"foreignKey:OrderID"`
+	UserID              uint    `gorm:"not null" json:"userId"`
+	User                User    `gorm:"foreignKey:UserID"`
+	ProductID           uint    `gorm:"not null" json:"productId"`
+	Product             Product `gorm:"foreignKey:ProductID"`
+	SellerID            uint    `gorm:"not null" json:"sellerId"`
+	Seller              Seller  `gorm:"foreignKey:SellerID"`
+	Price               float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	ProductOfferAmount  float64 `json:"product_offer_amount"`
+	CategoryOfferAmount float64 `json:"category_offer_amount"`
+	OtherOffers         float64 `json:"other_offers"`
+	FinalAmount         float64 `json:"final_amount"`
+	Status              string  `gorm:"type:varchar(100);default:'pending'" json:"status"`
 }
 
 type SellerRating struct {

@@ -119,7 +119,6 @@ type PlaceOrder struct {
 	AddressID     uint   `validate:"required,number" json:"address_id"`
 	PaymentMethod uint   `validate:"required" json:"payment_method"`
 	CouponCode    string `json:"coupon_code"`
-	ReferralCode  string `json:"referral_code"`
 }
 
 type RazorpayPayment struct {

@@ -75,7 +75,7 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
-	finalAmount := calculateFinalAmount(request.Price, request.OfferAmount, category.OfferPercentage)
+	finalAmount := calculateFinalAmount(request.OfferAmount, category.OfferPercentage)
 
 	newProduct := models.Product{
 		SellerID:     sellerID.(uint),
@@ -113,9 +113,9 @@ func AddProduct(c *gin.Context) {
 	})
 }
 
-func calculateFinalAmount(price, offerAmount float64, offerPercentage uint) float64 {
+func calculateFinalAmount(offerAmount float64, offerPercentage uint) float64 {
 	if offerPercentage > 0 {
-		discount := (price * float64(offerPercentage)) / 100
+		discount := (offerAmount * float64(offerPercentage)) / 100
 		finalAmount := offerAmount - discount
 		if finalAmount < 0 {
 			finalAmount = 0

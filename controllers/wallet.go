@@ -214,7 +214,7 @@ func RefundToUser(tx *gorm.DB, userID uint, orderIDStr string, amount float64, r
 	return nil
 }
 
-func ProcessWalletPayment(userID uint, orderIDStr string, couponDiscount float64, referralDiscount float64, tx *gorm.DB) (models.UserWallet, error) {
+func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.UserWallet, error) {
 	var User models.User
 	if err := tx.Where("id = ?", userID).First(&User).Error; err != nil {
 		return models.UserWallet{}, fmt.Errorf("failed to find the user")
@@ -298,10 +298,10 @@ func ProcessWalletPayment(userID uint, orderIDStr string, couponDiscount float64
 		return models.UserWallet{}, fmt.Errorf("failed to update payment and order status")
 	}
 
-	if !CartToOrderItems(userID, Order, couponDiscount, referralDiscount) {
-		tx.Rollback()
-		return models.UserWallet{}, fmt.Errorf("failed to transfer cart items to order")
-	}
+	// if !CartToOrderItems(userID, Order, couponDiscount) {
+	// 	tx.Rollback()
+	// 	return models.UserWallet{}, fmt.Errorf("failed to transfer cart items to order")
+	// }
 
 	var orderItems []models.OrderItem
 	if err := tx.Where("order_id = ?", orderIDStr).Find(&orderItems).Error; err != nil {

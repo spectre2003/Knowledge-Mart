@@ -79,7 +79,7 @@ func CreateCoupen(c *gin.Context) {
 		return
 	}
 
-	couponCode := utils.GenerateRandomString(6)
+	couponCode := utils.GenerateRandomString(7)
 
 	Coupon := models.CouponInventory{
 		CouponCode:            couponCode,
@@ -101,6 +101,9 @@ func CreateCoupen(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "successfully created coupon",
+		"data": gin.H{
+			"coupon": Coupon,
+		},
 	})
 }
 

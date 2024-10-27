@@ -81,7 +81,9 @@ func PlaceOrder(c *gin.Context) {
 	}
 
 	var discountedPrice float64
-	var CategoryDiscount float64
+	var TotalCategoryDiscount float64
+	var TotalProductOfferAmount float64
+	var ProductOfferAmount float64
 	var TotalAmount float64
 	var finalAmount float64
 	var sellerID uint
@@ -106,13 +108,17 @@ func PlaceOrder(c *gin.Context) {
 			return
 		}
 
-		discountedPrice = calculateFinalAmount(Product.Price, Product.OfferAmount, category.OfferPercentage)
+		discountedPrice = calculateFinalAmount(Product.OfferAmount, category.OfferPercentage)
 
 		TotalAmount += Product.Price
-		finalAmount += discountedPrice
 
-		categoryDiscount := Product.Price - discountedPrice
-		CategoryDiscount += categoryDiscount
+		ProductOfferAmount = Product.Price - Product.OfferAmount
+		TotalProductOfferAmount += ProductOfferAmount
+
+		CategoryDiscount := Product.OfferAmount - discountedPrice
+		TotalCategoryDiscount += CategoryDiscount
+
+		finalAmount += Product.OfferAmount
 
 		if sellerID == 0 {
 			sellerID = Product.SellerID
@@ -124,6 +130,8 @@ func PlaceOrder(c *gin.Context) {
 			return
 		}
 	}
+
+	finalAmount -= TotalCategoryDiscount
 
 	// Apply coupon discount if available
 	var CouponDiscount float64
@@ -139,21 +147,6 @@ func PlaceOrder(c *gin.Context) {
 		CouponDiscount = discount
 	}
 	finalAmount -= CouponDiscount
-
-	var ReferralDiscount float64
-	if request.ReferralCode != "" {
-		success, msg, discount := ApplyReferral(finalAmount, userIDStr, request.ReferralCode)
-		if !success {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status":  "failed",
-				"message": msg,
-			})
-			return
-		}
-		ReferralDiscount = discount
-	}
-
-	finalAmount -= ReferralDiscount
 
 	var Address models.Address
 	if err := database.DB.Where("user_id = ? AND id = ?", userIDStr, request.AddressID).First(&Address).Error; err != nil {
@@ -180,12 +173,18 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	if PaymentMethodOption == models.COD && finalAmount < 100 {
+	if PaymentMethodOption == models.COD && finalAmount > 1000 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": "COD is not applicable for order",
 		})
 		return
+	}
+
+	deliveryCharge := 0
+	if finalAmount < 500 {
+		deliveryCharge = 40
+		finalAmount += float64(deliveryCharge)
 	}
 
 	status := models.OrderStatusPending
@@ -198,15 +197,16 @@ func PlaceOrder(c *gin.Context) {
 
 	order := models.Order{
 		UserID:                 userIDStr,
-		TotalAmount:            TotalAmount,
+		TotalAmount:            RoundDecimalValue(TotalAmount),
 		FinalAmount:            RoundDecimalValue(finalAmount),
 		PaymentMethod:          PaymentMethodOption,
 		PaymentStatus:          models.OrderStatusPending,
 		OrderedAt:              time.Now(),
 		CouponCode:             request.CouponCode,
 		CouponDiscountAmount:   RoundDecimalValue(CouponDiscount),
-		ReferralDiscountAmount: RoundDecimalValue(ReferralDiscount),
-		CategoryDiscountAmount: RoundDecimalValue(CategoryDiscount),
+		ProductOfferAmount:     RoundDecimalValue(TotalProductOfferAmount),
+		DeliveryCharge:         float64(deliveryCharge),
+		CategoryDiscountAmount: RoundDecimalValue(TotalCategoryDiscount),
 		SellerID:               sellerID,
 		Status:                 status,
 		ShippingAddress: models.ShippingAddress{
@@ -228,24 +228,22 @@ func PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	if !CartToOrderItems(userIDStr, order, CouponDiscount) {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Failed to transfer cart items to order.",
+		})
+		return
+	}
+
 	if PaymentMethodOption == models.Wallet {
 		orderIDStr := fmt.Sprintf("%d", order.OrderID)
-		if _, err := ProcessWalletPayment(userIDStr, orderIDStr, CouponDiscount, ReferralDiscount, tx); err != nil {
+		if _, err := ProcessWalletPayment(userIDStr, orderIDStr, tx); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "failed",
 				"message": err.Error(),
-			})
-			return
-		}
-	}
-
-	if PaymentMethodOption == models.COD {
-		if !CartToOrderItems(userIDStr, order, CouponDiscount, ReferralDiscount) {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "Failed to transfer cart items to order.",
 			})
 			return
 		}
@@ -264,7 +262,7 @@ func PlaceOrder(c *gin.Context) {
 	})
 }
 
-func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, ReferralDiscount float64) bool {
+func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) bool {
 	var CartItems []models.Cart
 	if err := database.DB.Preload("Product").Where("user_id = ?", UserID).Find(&CartItems).Error; err != nil {
 		return false
@@ -279,8 +277,6 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 		totalCartPrice += cartItem.Product.OfferAmount
 	}
 
-	totalDiscount := CouponDiscount + ReferralDiscount
-
 	tx := database.DB.Begin()
 
 	for _, cartItem := range CartItems {
@@ -292,24 +288,31 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 			return false
 		}
 
-		discountedPrice := calculateFinalAmount(Product.Price, Product.OfferAmount, category.OfferPercentage)
+		discountedPrice := calculateFinalAmount(Product.OfferAmount, category.OfferPercentage)
+		productOffer := Product.Price - Product.OfferAmount
 
-		finalPrice := discountedPrice
-		if totalDiscount > 0 {
-			proportionalDiscount := (Product.OfferAmount / totalCartPrice) * totalDiscount
+		categoryOffer := Product.OfferAmount - discountedPrice
+		finalPrice := Product.Price - categoryOffer - productOffer
+
+		var proportionalDiscount float64
+		if CouponDiscount > 0 {
+			proportionalDiscount = (Product.OfferAmount / totalCartPrice) * CouponDiscount
 			finalPrice -= proportionalDiscount
 		}
 
-		fmt.Println(finalPrice)
+		finalPrice = math.Max(0, finalPrice)
 
 		orderItem := models.OrderItem{
-			OrderID:            Order.OrderID,
-			ProductID:          cartItem.ProductID,
-			UserID:             UserID,
-			SellerID:           Product.SellerID,
-			Price:              finalPrice,
-			ProductOfferAmount: Product.OfferAmount,
-			Status:             models.OrderStatusConfirmed,
+			OrderID:             Order.OrderID,
+			ProductID:           cartItem.ProductID,
+			UserID:              UserID,
+			SellerID:            Product.SellerID,
+			Price:               Product.Price,
+			ProductOfferAmount:  RoundDecimalValue(productOffer),
+			CategoryOfferAmount: RoundDecimalValue(categoryOffer),
+			OtherOffers:         RoundDecimalValue(proportionalDiscount),
+			FinalAmount:         RoundDecimalValue(finalPrice),
+			Status:              models.OrderStatusPending,
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {
@@ -324,12 +327,14 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64, R
 		}
 	}
 
-	if err := tx.Where("user_id = ?", UserID).Delete(&CartItems).Error; err != nil {
+	if err := tx.Where("user_id = ?", UserID).Delete(&models.Cart{}).Error; err != nil {
 		tx.Rollback()
 		return false
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return false
+	}
 
 	return true
 }
@@ -383,7 +388,7 @@ func GetUserOrders(c *gin.Context) {
 				Description: item.Product.Description,
 				Price:       item.Price,
 				Image:       item.Product.Image,
-				//SellerName:  item.Seller.UserName,
+				FinalAmount: item.FinalAmount,
 				OrderStatus: item.Status,
 			})
 		}
@@ -616,9 +621,9 @@ func UserCheckOrderStatus(c *gin.Context) {
 				ProductName: orderItem.Product.Name,
 				CategoryID:  orderItem.Product.CategoryID,
 				Description: orderItem.Product.Description,
-				Price:       orderItem.Price,
+				Price:       RoundDecimalValue(orderItem.Price),
+				FinalAmount: RoundDecimalValue(orderItem.FinalAmount),
 				Image:       orderItem.Product.Image,
-				//SellerName:  orderItem.Seller.UserName,
 				OrderStatus: orderItem.Status,
 			})
 		}
@@ -644,6 +649,7 @@ func UserCheckOrderStatus(c *gin.Context) {
 			OrderID:         order.OrderID,
 			OrderedAt:       order.OrderedAt,
 			TotalAmount:     RoundDecimalValue(order.TotalAmount),
+			DeliveryCharge:  order.DeliveryCharge,
 			FinalAmount:     RoundDecimalValue(order.FinalAmount),
 			Items:           orderItemResponses,
 			Status:          order.Status,

@@ -6,18 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"os"
-	"strings"
-
-	//"github.com/joho/godotenv"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
 	"knowledgeMart/utils"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/smtp"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -239,6 +237,19 @@ func EmailSignup(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
+	}
+
+	getReferralCode := c.Query("referral_code")
+
+	if getReferralCode != "" {
+		success, err := GetReferralOffer(User.ID, getReferralCode)
+		if !success {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": err,
+			})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

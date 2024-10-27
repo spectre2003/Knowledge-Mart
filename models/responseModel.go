@@ -135,6 +135,7 @@ type UserOrderResponse struct {
 	OrderID         uint                `json:"orderId"`
 	OrderedAt       time.Time           `json:"orderedAt"`
 	TotalAmount     float64             `json:"total_amount"`
+	DeliveryCharge  float64             `json:"delivery_charge"`
 	FinalAmount     float64             `json:"final_amount"`
 	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 	Status          string              `json:"orderStatus"`
@@ -150,8 +151,8 @@ type OrderItemResponse struct {
 	CategoryID  uint           `json:"categoryId"`
 	Description string         `json:"description"`
 	Price       float64        `json:"price"`
-	//SellerName  string         `json:"sellerName"`
-	OrderStatus string `json:"orderStatus"`
+	FinalAmount float64        `json:"finalAmount"`
+	OrderStatus string         `json:"orderStatus"`
 }
 
 type SellerOverallSalesReport struct {
@@ -172,9 +173,10 @@ type OrderCount struct {
 }
 
 type AmountInformation struct {
+	TotalAmountBeforeDeduction  float64 `json:"total_amount_before_deduction"`
 	TotalCouponDeduction        float64 `json:"total_coupon_deduction"`
 	TotalCategoryOfferDeduction float64 `json:"total_category_offer_deduction"`
-	TotalAmountBeforeDeduction  float64 `json:"total_amount_before_deduction"`
-	TotalReferralDeduction      float64 `json:"total_referral_offer_deduction"`
+	TotalProuctOfferDeduction   float64 `json:"total_product_offer_deduction"`
+	TotalDeliveryCharges        float64 `json:"total_delivery_charge"`
 	TotalAmountAfterDeduction   float64 `json:"total_amount_after_deduction"`
 }

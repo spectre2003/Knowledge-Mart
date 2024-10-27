@@ -70,7 +70,7 @@ func RegisterRoutes(router *gin.Engine) {
 		userRoutes.GET("/cart_view", controllers.ListAllCart)
 		userRoutes.DELETE("/remove_cart", controllers.RemoveItemFromCart)
 		userRoutes.GET("/coupon/cart", controllers.ApplyCouponOnCart)
-		userRoutes.GET("/referral/cart", controllers.ApplyReferralOnCart)
+		//userRoutes.GET("/referral/cart", controllers.ApplyReferralOnCart)
 
 		//order
 		userRoutes.POST("/order_place", controllers.PlaceOrder)

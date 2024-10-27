@@ -97,24 +97,23 @@ func VerifyPayment(c *gin.Context) {
 
 	fmt.Println("Payment Info:", paymentInfo)
 
-	var order models.Order
-	if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
-		fmt.Println("Failed to retrieve order:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve order"})
-		return
-	}
+	// var order models.Order
+	// if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
+	// 	fmt.Println("Failed to retrieve order:", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve order"})
+	// 	return
+	// }
 
-	couponDiscount := order.CouponDiscountAmount
-	referralDiscount := order.ReferralDiscountAmount
+	//couponDiscount := order.CouponDiscountAmount
 
-	if !CartToOrderItems(order.UserID, order, couponDiscount, referralDiscount) {
-		database.DB.Delete(&order)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "Failed to transfer cart items to order",
-		})
-		return
-	}
+	// if !CartToOrderItems(order.UserID, order, couponDiscount) {
+	// 	database.DB.Delete(&order)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"status":  "failed",
+	// 		"message": "Failed to transfer cart items to order",
+	// 	})
+	// 	return
+	// }
 
 	payment := models.Payment{
 		OrderID:           orderIDStr,
@@ -149,6 +148,16 @@ func VerifyPayment(c *gin.Context) {
 			})
 			return
 		}
+		if err := database.DB.Model(&models.OrderItem{}).
+			Where("order_id = ?", orderIDStr).
+			Update("status", models.OrderStatusConfirmed).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "Failed to update order item status",
+			})
+			return
+		}
+
 		database.DB.Model(&models.Payment{}).
 			Where("order_id = ?", orderIDStr).
 			Update("payment_status", models.PaymentStatusPaid)

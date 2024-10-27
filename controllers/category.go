@@ -88,7 +88,7 @@ func ListCategoryProductList(c *gin.Context) {
 			return
 		}
 
-		discountedPrice := calculateFinalAmount(product.Price, product.OfferAmount, category.OfferPercentage)
+		discountedPrice := calculateFinalAmount(product.OfferAmount, category.OfferPercentage)
 
 		TotalAmount += product.OfferAmount
 		finalAmount += discountedPrice
