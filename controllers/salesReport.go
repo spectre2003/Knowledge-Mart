@@ -84,16 +84,17 @@ func SellerOverAllSalesReport(c *gin.Context) {
 			endDate = time.Now().Format("2006-01-02")
 		}
 
-		result, amount, err := TotalOrders(startDate, endDate, input.PaymentStatus, sellerIDStr)
+		result, amount, _, err := TotalOrders(startDate, endDate, input.PaymentStatus, sellerIDStr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"status":  true,
-			"message": "successfully created sales report",
 			"result":  result,
 			"amount":  amount,
+			"status":  true,
+			"message": "successfully created sales report",
+			//"order_counts": orderDateCounts,
 		})
 		return
 	}
@@ -117,7 +118,7 @@ func SellerOverAllSalesReport(c *gin.Context) {
 		}
 	}
 
-	result, amount, err := TotalOrders(input.StartDate, input.EndDate, input.PaymentStatus, sellerIDStr)
+	result, amount, _, err := TotalOrders(input.StartDate, input.EndDate, input.PaymentStatus, sellerIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
 		return
@@ -128,54 +129,35 @@ func SellerOverAllSalesReport(c *gin.Context) {
 		"message": "successfully created sales report",
 		"result":  result,
 		"amount":  amount,
+		//"order_counts": orderDateCounts,
 	})
 }
 
-func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) (models.OrderCount, models.AmountInformation, error) {
+func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) (models.OrderCount, models.AmountInformation, []models.OrderDateCount, error) {
 	var orders []models.Order
 
 	parsedFrom, err := time.Parse("2006-01-02", From)
 	if err != nil {
-		return models.OrderCount{}, models.AmountInformation{}, fmt.Errorf("error parsing From time: %v", err)
+		return models.OrderCount{}, models.AmountInformation{}, nil, fmt.Errorf("error parsing From time: %v", err)
 	}
 	parsedTill, err := time.Parse("2006-01-02", Till)
 	if err != nil {
-		return models.OrderCount{}, models.AmountInformation{}, fmt.Errorf("error parsing Till time: %v", err)
+		return models.OrderCount{}, models.AmountInformation{}, nil, fmt.Errorf("error parsing Till time: %v", err)
 	}
 
-	// Set start and end times for querying
 	fFrom := time.Date(parsedFrom.Year(), parsedFrom.Month(), parsedFrom.Day(), 0, 0, 0, 0, time.UTC)
 	fTill := time.Date(parsedTill.Year(), parsedTill.Month(), parsedTill.Day(), 23, 59, 59, 999999999, time.UTC)
 
-	startTime := fFrom.Format("2006-01-02T15:04:05Z")
-	endDate := fTill.Format("2006-01-02T15:04:05Z")
-
-	// Query orders based on conditions
-	query := database.DB.Where("ordered_at BETWEEN ? AND ? AND payment_status = ?", startTime, endDate, PaymentStatus)
+	query := database.DB.Where("ordered_at BETWEEN ? AND ? AND payment_status = ?", fFrom, fTill, PaymentStatus)
 	if SellerID != 0 {
 		query = query.Where("seller_id = ?", SellerID)
 	}
 	if err := query.Find(&orders).Error; err != nil {
-		return models.OrderCount{}, models.AmountInformation{}, fmt.Errorf("error fetching orders: %v", err)
-	}
-
-	// Initialize data
-	statusList := []string{
-		models.OrderStatusPending,
-		models.OrderStatusConfirmed,
-		models.OrderStatusShipped,
-		models.OrderStatusDelivered,
-		models.OrderStatusCanceled,
-		models.OrderStatusReturned,
-	}
-	orderStatusCounts := make(map[string]int64)
-	for _, status := range statusList {
-		orderStatusCounts[status] = 0
+		return models.OrderCount{}, models.AmountInformation{}, nil, fmt.Errorf("error fetching orders: %v", err)
 	}
 
 	var AccountInformation models.AmountInformation
 
-	// Aggregate amounts and status counts
 	for _, order := range orders {
 		AccountInformation.TotalAmountBeforeDeduction += RoundDecimalValue(order.TotalAmount)
 		AccountInformation.TotalCouponDeduction += RoundDecimalValue(order.CouponDiscountAmount)
@@ -183,20 +165,43 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 		AccountInformation.TotalDeliveryCharges += RoundDecimalValue(order.DeliveryCharge)
 		AccountInformation.TotalCategoryOfferDeduction += RoundDecimalValue(order.CategoryDiscountAmount)
 		AccountInformation.TotalAmountAfterDeduction += RoundDecimalValue(order.FinalAmount)
-
-		for _, status := range statusList {
-			var count int64
-			if err := database.DB.Model(&models.OrderItem{}).Where("order_id = ? AND status = ?", order.OrderID, status).Count(&count).Error; err != nil {
-				return models.OrderCount{}, models.AmountInformation{}, fmt.Errorf("error counting order items with status %s: %v", status, err)
-			}
-			orderStatusCounts[status] += count
-		}
 	}
 
-	// Calculate total order count
+	type StatusCount struct {
+		Status string
+		Count  int64
+	}
+	var statusCounts []StatusCount
+	orderIDs := make([]uint, len(orders))
+	for i, order := range orders {
+		orderIDs[i] = order.OrderID
+	}
+
+	if err := database.DB.Model(&models.OrderItem{}).
+		Where("order_id IN (?)", orderIDs).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&statusCounts).Error; err != nil {
+		return models.OrderCount{}, models.AmountInformation{}, nil, fmt.Errorf("error counting order items by status: %v", err)
+	}
+
+	orderStatusCounts := make(map[string]int64)
+	for _, sc := range statusCounts {
+		orderStatusCounts[sc.Status] = sc.Count
+	}
+
 	var totalCount int64
 	for _, count := range orderStatusCounts {
 		totalCount += count
+	}
+
+	var orderDateCounts []models.OrderDateCount
+	if err := database.DB.Model(&models.Order{}).
+		Select("DATE(ordered_at) as date, COUNT(*) as count").
+		Where("ordered_at BETWEEN ? AND ? AND payment_status = ?", fFrom, fTill, PaymentStatus).
+		Group("DATE(ordered_at)").
+		Scan(&orderDateCounts).Error; err != nil {
+		return models.OrderCount{}, models.AmountInformation{}, nil, fmt.Errorf("error fetching order dates: %v", err)
 	}
 
 	return models.OrderCount{
@@ -207,7 +212,7 @@ func TotalOrders(From string, Till string, PaymentStatus string, SellerID uint) 
 		TotalDelivered: uint(orderStatusCounts[models.OrderStatusDelivered]),
 		TotalCancelled: uint(orderStatusCounts[models.OrderStatusCanceled]),
 		TotalReturned:  uint(orderStatusCounts[models.OrderStatusReturned]),
-	}, AccountInformation, nil
+	}, AccountInformation, orderDateCounts, nil
 }
 
 func DownloadSalesReportPDF(c *gin.Context) {
@@ -223,13 +228,11 @@ func DownloadSalesReportPDF(c *gin.Context) {
 	paymentStatus := c.Query("payment_status")
 	limit := c.Query("limit")
 
-	// Validate date/limit inputs
 	if limit == "" && (startDate == "" || endDate == "") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "please provide either limit or start_date and end_date"})
 		return
 	}
 
-	// Handle limit-based date ranges
 	if limit != "" {
 		switch limit {
 		case "day":
@@ -250,30 +253,26 @@ func DownloadSalesReportPDF(c *gin.Context) {
 		}
 	}
 
-	// Fetch order data
-	orderCount, amountInfo, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
+	orderCount, amountInfo, orderDateCounts, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
 		return
 	}
 
-	// Paths for generated charts
 	orderStatusChartPath := "/tmp/order_status_chart.png"
 	orderHistoryChartPath := "/tmp/order_history_chart.png"
 
-	// Generate and save charts (assumes you have chart generation functions for these)
 	err = generateOrderStatusChart(orderStatusChartPath, orderCount)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate order status chart"})
 		return
 	}
-	err = generateOrderHistoryChart(orderHistoryChartPath, orderCount)
+	err = generateOrderHistoryChart(orderHistoryChartPath, orderDateCounts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate order history chart"})
 		return
 	}
 
-	// Generate the PDF report
 	pdfBytes, err := GenerateSalesReportPDF(orderCount, amountInfo, startDate, endDate, paymentStatus, orderStatusChartPath, orderHistoryChartPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
@@ -299,11 +298,10 @@ func generateOrderStatusChart(outputPath string, orderCount models.OrderCount) e
 		},
 	}
 
-	// Optional styling for the bars
 	for i := range barChart.Bars {
 		barChart.Bars[i].Style = chart.Style{
-			FillColor:   drawing.ColorFromHex("87CEEB"), // Light Blue for bars
-			StrokeColor: drawing.ColorFromHex("4682B4"), // Darker Blue for bar outline
+			FillColor:   drawing.ColorFromHex("87CEEB"),
+			StrokeColor: drawing.ColorFromHex("4682B4"),
 			StrokeWidth: 1.0,
 		}
 	}
@@ -317,23 +315,29 @@ func generateOrderStatusChart(outputPath string, orderCount models.OrderCount) e
 	return barChart.Render(chart.PNG, file)
 }
 
-func generateOrderHistoryChart(outputPath string, orderCount models.OrderCount) error {
-	// Sample data points
-	dates := []time.Time{
-		time.Now().AddDate(0, 0, -5),
-		time.Now().AddDate(0, 0, -4),
-		time.Now().AddDate(0, 0, -3),
-		time.Now().AddDate(0, 0, -2),
-		time.Now().AddDate(0, 0, -1),
-		time.Now(),
+func generateOrderHistoryChart(outputPath string, orderDateCounts []models.OrderDateCount) error {
+	endDate := time.Now().Truncate(24 * time.Hour)
+	startDate := endDate.AddDate(0, 0, -6)
+
+	dateMap := make(map[string]int64)
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		dateStr := d.Format("2006-01-02")
+		dateMap[dateStr] = 0
 	}
-	values := []float64{
-		float64(orderCount.TotalPending),
-		float64(orderCount.TotalConfirmed),
-		float64(orderCount.TotalShipped),
-		float64(orderCount.TotalDelivered),
-		float64(orderCount.TotalCancelled),
-		float64(orderCount.TotalReturned),
+
+	for _, orderDateCount := range orderDateCounts {
+		orderDateStr := orderDateCount.Date.Format("2006-01-02")
+		if _, exists := dateMap[orderDateStr]; exists {
+			dateMap[orderDateStr] += orderDateCount.Count
+		}
+	}
+
+	var dates []time.Time
+	var values []float64
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		dateStr := d.Format("2006-01-02")
+		dates = append(dates, d)
+		values = append(values, float64(dateMap[dateStr]))
 	}
 
 	graph := chart.Chart{
@@ -361,11 +365,17 @@ func generateOrderHistoryChart(outputPath string, orderCount models.OrderCount) 
 
 	file, err := os.Create(outputPath)
 	if err != nil {
+		log.Printf("Failed to create output file: %s, error: %v", outputPath, err)
 		return err
 	}
 	defer file.Close()
 
-	return graph.Render(chart.PNG, file)
+	if err := graph.Render(chart.PNG, file); err != nil {
+		log.Printf("Failed to render chart: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func GenerateSalesReportPDF(orderCount models.OrderCount, amountInfo models.AmountInformation, startDate string, endDate string, paymentStatus string, orderStatusChartPath string, orderHistoryChartPath string) ([]byte, error) {
@@ -436,8 +446,7 @@ func GenerateSalesReportPDF(orderCount models.OrderCount, amountInfo models.Amou
 	pdf.Ln(10)
 	pdf.ImageOptions(orderStatusChartPath, 10, pdf.GetY(), 100, 60, false, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, 0, "")
 
-	// Adding Order History Chart
-	pdf.Ln(70) // Adjust this to place the graph in the right spot
+	pdf.Ln(70)
 	pdf.SetFont("Arial", "B", 14)
 	pdf.Cell(40, 10, "Order History Graph")
 	pdf.Ln(10)
@@ -506,13 +515,13 @@ func DownloadSalesReportExcel(c *gin.Context) {
 		}
 	}
 
-	orderCount, amountInfo, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
+	orderCount, amountInfo, orderDateCounts, err := TotalOrders(startDate, endDate, paymentStatus, sellerIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing orders"})
 		return
 	}
 
-	excelBytes, err := GenerateSalesReportExcel(orderCount, amountInfo, startDate, endDate, paymentStatus)
+	excelBytes, err := GenerateSalesReportExcel(orderCount, amountInfo, startDate, endDate, paymentStatus, orderDateCounts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate Excel report"})
 		return
@@ -520,11 +529,11 @@ func DownloadSalesReportExcel(c *gin.Context) {
 
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=sales_report.xlsx")
-	c.Header("Content-Length", strconv.Itoa(len(excelBytes))) // Ensure Content-Length is added
+	c.Header("Content-Length", strconv.Itoa(len(excelBytes)))
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelBytes)
 }
 
-func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.AmountInformation, startDate, endDate, paymentStatus string) ([]byte, error) {
+func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.AmountInformation, startDate, endDate, paymentStatus string, orderDateCounts []models.OrderDateCount) ([]byte, error) {
 	f := excelize.NewFile()
 
 	f.SetCellValue("Sheet1", "A1", "Sales Report")
@@ -536,6 +545,7 @@ func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.Am
 	f.SetCellValue("Sheet1", "A4", "Payment Status")
 	f.SetCellValue("Sheet1", "B4", paymentStatus)
 
+	// Set up order summary
 	f.SetCellValue("Sheet1", "A6", "Total Orders")
 	f.SetCellValue("Sheet1", "B6", strconv.Itoa(int(orderCount.TotalOrder)))
 
@@ -551,32 +561,34 @@ func GenerateSalesReportExcel(orderCount models.OrderCount, amountInfo models.Am
 	f.SetCellValue("Sheet1", "A10", "Total Product Offer Deduction")
 	f.SetCellValue("Sheet1", "B10", fmt.Sprintf("%.2f", amountInfo.TotalProuctOfferDeduction))
 
-	f.SetCellValue("Sheet1", "A10", "Total Delivery charges")
-	f.SetCellValue("Sheet1", "B10", fmt.Sprintf("%.2f", amountInfo.TotalDeliveryCharges))
+	// Fixed the row number for total delivery charges
+	f.SetCellValue("Sheet1", "A11", "Total Delivery Charges")
+	f.SetCellValue("Sheet1", "B11", fmt.Sprintf("%.2f", amountInfo.TotalDeliveryCharges))
 
-	f.SetCellValue("Sheet1", "A11", "Total Amount After Deduction")
-	f.SetCellValue("Sheet1", "B11", fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
+	f.SetCellValue("Sheet1", "A12", "Total Amount After Deduction")
+	f.SetCellValue("Sheet1", "B12", fmt.Sprintf("%.2f", amountInfo.TotalAmountAfterDeduction))
 
 	// Adding Order Status Summary
-	f.SetCellValue("Sheet1", "A13", "Order Status Summary")
-	f.SetCellValue("Sheet1", "A14", "Total Pending Orders")
-	f.SetCellValue("Sheet1", "B14", strconv.Itoa(int(orderCount.TotalPending)))
+	f.SetCellValue("Sheet1", "A14", "Order Status Summary")
+	f.SetCellValue("Sheet1", "A15", "Total Pending Orders")
+	f.SetCellValue("Sheet1", "B15", strconv.Itoa(int(orderCount.TotalPending)))
 
-	f.SetCellValue("Sheet1", "A15", "Total Confirmed Orders")
-	f.SetCellValue("Sheet1", "B15", strconv.Itoa(int(orderCount.TotalConfirmed)))
+	f.SetCellValue("Sheet1", "A16", "Total Confirmed Orders")
+	f.SetCellValue("Sheet1", "B16", strconv.Itoa(int(orderCount.TotalConfirmed)))
 
-	f.SetCellValue("Sheet1", "A16", "Total Shipped Orders")
-	f.SetCellValue("Sheet1", "B16", strconv.Itoa(int(orderCount.TotalShipped)))
+	f.SetCellValue("Sheet1", "A17", "Total Shipped Orders")
+	f.SetCellValue("Sheet1", "B17", strconv.Itoa(int(orderCount.TotalShipped)))
 
-	f.SetCellValue("Sheet1", "A17", "Total Delivered Orders")
-	f.SetCellValue("Sheet1", "B17", strconv.Itoa(int(orderCount.TotalDelivered)))
+	f.SetCellValue("Sheet1", "A18", "Total Delivered Orders")
+	f.SetCellValue("Sheet1", "B18", strconv.Itoa(int(orderCount.TotalDelivered)))
 
-	f.SetCellValue("Sheet1", "A18", "Total Cancelled Orders")
-	f.SetCellValue("Sheet1", "B18", strconv.Itoa(int(orderCount.TotalCancelled)))
+	f.SetCellValue("Sheet1", "A19", "Total Cancelled Orders")
+	f.SetCellValue("Sheet1", "B19", strconv.Itoa(int(orderCount.TotalCancelled)))
 
-	f.SetCellValue("Sheet1", "A19", "Total Returned Orders")
-	f.SetCellValue("Sheet1", "B19", strconv.Itoa(int(orderCount.TotalReturned)))
+	f.SetCellValue("Sheet1", "A20", "Total Returned Orders")
+	f.SetCellValue("Sheet1", "B20", strconv.Itoa(int(orderCount.TotalReturned)))
 
+	// Write to buffer
 	var buf bytes.Buffer
 	if err := f.Write(&buf); err != nil {
 		return nil, err
@@ -737,10 +749,8 @@ func GeneratePDFInvoice(order models.Order, orderItems []models.OrderItem, user 
 		totalPrice += item.Price
 	}
 
-	// Add space before the Total row
 	pdf.Ln(5)
 
-	// Total row with padding and centered alignment
 	pdf.SetFont("Arial", "B", 10)
 	pdf.CellFormat(85, 10, "Total", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(20, 10, fmt.Sprintf("%.2f", totalPrice), "1", 0, "C", false, 0, "")
@@ -750,9 +760,8 @@ func GeneratePDFInvoice(order models.Order, orderItems []models.OrderItem, user 
 	pdf.CellFormat(23, 10, fmt.Sprintf("%.2f", totalFinalAmount), "1", 0, "C", false, 0, "")
 	pdf.Ln(12)
 
-	// Thank you note, centered and with more space below the table
 	pdf.SetFont("Arial", "B", 12)
-	pdf.Ln(5) // Additional space from the total row
+	pdf.Ln(5)
 	pdf.CellFormat(0, 10, "Thank you for shopping with Knowledge Mart!", "", 1, "C", false, 0, "")
 	pdf.Ln(5)
 	pdf.CellFormat(0, 10, "Visit us at: www.knowledgemart.com", "", 1, "C", false, 0, "")

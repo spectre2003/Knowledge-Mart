@@ -204,3 +204,8 @@ type CouponUsage struct {
 	CouponCode string `json:"coupon_code"`
 	UsageCount uint   `json:"usage_count"`
 }
+
+type OrderDateCount struct {
+	Date  time.Time `json:"date"`
+	Count int64     `json:"count"`
+}

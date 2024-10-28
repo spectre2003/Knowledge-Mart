@@ -51,6 +51,13 @@ func CreateOrder(c *gin.Context) {
 		})
 		return
 	}
+	if order.PaymentStatus == models.PaymentStatusPaid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "you already paid for this order",
+		})
+		return
+	}
 
 	amount := int(order.FinalAmount * 100)
 
@@ -97,23 +104,12 @@ func VerifyPayment(c *gin.Context) {
 
 	fmt.Println("Payment Info:", paymentInfo)
 
-	// var order models.Order
-	// if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
-	// 	fmt.Println("Failed to retrieve order:", err)
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve order"})
-	// 	return
-	// }
-
-	//couponDiscount := order.CouponDiscountAmount
-
-	// if !CartToOrderItems(order.UserID, order, couponDiscount) {
-	// 	database.DB.Delete(&order)
-	// 	c.JSON(http.StatusInternalServerError, gin.H{
-	// 		"status":  "failed",
-	// 		"message": "Failed to transfer cart items to order",
-	// 	})
-	// 	return
-	// }
+	// Initialize transaction
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
 
 	payment := models.Payment{
 		OrderID:           orderIDStr,
@@ -125,54 +121,91 @@ func VerifyPayment(c *gin.Context) {
 		PaymentStatus:     models.OnlinePaymentPending,
 	}
 
-	if err := database.DB.Model(&models.Payment{}).Create(&payment).Error; err != nil {
+	if err := tx.Create(&payment).Error; err != nil {
+		tx.Rollback()
 		fmt.Println("Failed to create payment record:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "failed",
-			"message": "Failed to create payment record: " + err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to create payment record: " + err.Error()})
 		return
 	}
 
 	secret := os.Getenv("RAZORPAY_KEY_SECRET")
 	if verifySignature(paymentInfo.OrderID, paymentInfo.PaymentID, paymentInfo.Signature, secret) {
-		if err := database.DB.Model(&models.Order{}).
+		if err := tx.Model(&models.Order{}).
 			Where("order_id = ?", orderIDStr).
 			Updates(map[string]interface{}{
 				"payment_status": models.PaymentStatusPaid,
 				"status":         models.OrderStatusConfirmed,
 			}).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "Failed to update order payment and status",
-			})
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to update order payment and status"})
 			return
 		}
-		if err := database.DB.Model(&models.OrderItem{}).
+
+		if err := tx.Model(&models.OrderItem{}).
 			Where("order_id = ?", orderIDStr).
 			Update("status", models.OrderStatusConfirmed).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to update order item status"})
+			return
+		}
+
+		var orderItems []models.OrderItem
+		if err := tx.Where("order_id = ?", orderIDStr).Find(&orderItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to fetch order items"})
+			return
+		}
+
+		for _, item := range orderItems {
+			if err := tx.Model(&models.Product{}).
+				Where("id = ?", item.ProductID).
+				Update("availability", false).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to update product availability"})
+				return
+			}
+		}
+
+		var order models.Order
+		if err := tx.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
+			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "failed",
-				"message": "Failed to update order item status",
+				"message": "Failed to fetch order",
 			})
 			return
 		}
 
-		database.DB.Model(&models.Payment{}).
+		userID := order.UserID
+		if err := tx.Where("user_id = ?", userID).Delete(&models.Cart{}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to delete user's cart"})
+			return
+		}
+
+		if err := tx.Model(&models.Payment{}).
 			Where("order_id = ?", orderIDStr).
-			Update("payment_status", models.PaymentStatusPaid)
+			Update("payment_status", models.PaymentStatusPaid).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to update payment status"})
+			return
+		}
 
 		if !AddMoneyToSellerWallet(orderIDStr) {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "Failed to add money to seller wallet",
-			})
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to add money to seller wallet"})
+			return
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Transaction commit failed"})
 			return
 		}
 
 		fmt.Println("Payment verified successfully, order confirmed")
 		c.JSON(http.StatusOK, gin.H{"status": "Payment verified successfully"})
 	} else {
+		tx.Rollback()
 		fmt.Println("Invalid payment signature, order marked as pending")
 		c.JSON(http.StatusOK, gin.H{"status": "Payment verification failed, order marked as pending"})
 	}
