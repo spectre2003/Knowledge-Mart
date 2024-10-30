@@ -4,14 +4,17 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	database "knowledgeMart/config"
 	"knowledgeMart/models"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/razorpay/razorpay-go"
+	"gorm.io/gorm"
 )
 
 func RenderRazorpay(c *gin.Context) {
@@ -35,12 +38,21 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Order ID is required"})
 		return
 	}
+
 	fmt.Println("orderid=" + orderIDStr)
 	var order models.Order
 
 	if err := database.DB.Model(&models.Order{}).Where("order_id=?", orderIDStr).First(&order).Error; err != nil {
 		fmt.Println("Error fetching order:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching order"})
+		return
+	}
+
+	if order.PaymentStatus == models.PaymentStatusFailed {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "your maximum payment attempt is reached",
+		})
 		return
 	}
 
@@ -221,4 +233,82 @@ func verifySignature(orderID, paymentID, signature, secret string) bool {
 	expectedSignature := hex.EncodeToString(h.Sum(nil))
 
 	return expectedSignature == signature
+}
+func HandleFailedPayment(c *gin.Context) {
+	log.Println("HandleFailedPayment function started")
+
+	orderIDStr := c.Param("orderID")
+	if orderIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order ID is required"})
+		return
+	}
+
+	var requestBody struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.BindJSON(&requestBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	var order models.Order
+	if err := database.DB.Where("order_id = ?", orderIDStr).First(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Order not found"})
+		return
+	}
+
+	order.FailedPaymentCount++
+	if order.FailedPaymentCount >= 3 {
+		order.PaymentStatus = models.PaymentStatusFailed
+
+		payment := models.Payment{
+			OrderID:           orderIDStr,
+			WalletPaymentID:   "",
+			RazorpayOrderID:   "",
+			RazorpayPaymentID: "",
+			RazorpaySignature: "",
+			PaymentGateway:    models.Razorpay,
+			PaymentStatus:     models.PaymentStatusFailed,
+		}
+
+		if err := database.DB.Create(&payment).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment record"})
+			return
+		}
+	}
+
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order payment status"})
+		return
+	}
+
+	statusMessage := "Payment failed, please try again."
+	if order.PaymentStatus == models.PaymentStatusFailed {
+		statusMessage = "Order payment status marked as failed after multiple attempts."
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "failed",
+		"message": statusMessage,
+		"reason":  requestBody.Reason,
+	})
+	fmt.Printf("Order %s failed payment attempt %d. Status: %s\n", orderIDStr, order.FailedPaymentCount, order.PaymentStatus)
+}
+
+func CheckFailedAttempts(c *gin.Context) {
+	orderID := c.Param("orderID")
+
+	var order models.Order
+	err := database.DB.Select("failed_payment_count").First(&order, orderID).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to check failed attempts"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"failed_attempts": order.FailedPaymentCount})
 }

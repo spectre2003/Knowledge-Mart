@@ -112,6 +112,7 @@ type Order struct {
 	ShippingAddress        ShippingAddress `gorm:"embedded" json:"shipping_address"`
 	SellerID               uint            `gorm:"not null" json:"seller_id"`
 	Status                 string          `gorm:"type:varchar(100);default:'pending'" json:"status"`
+	FailedPaymentCount     int             `gorm:"default:0" json:"failed_Payment_count"`
 }
 
 type ShippingAddress struct {
@@ -195,7 +196,7 @@ type CouponInventory struct {
 	Percentage            uint    `validate:"required" json:"percentage"`
 	MaximumUsage          uint    `validate:"required" json:"maximum_usage"`
 	MinimumAmount         float64 `validate:"required" json:"minimum_amount"`
-	MaximumDiscountAmount float64 `validate:"required" json:"maximum_amount"`
+	MaximumDiscountAmount float64 `validate:"required" json:"maximum_discount_amount"`
 }
 
 type CouponUsage struct {

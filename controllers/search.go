@@ -9,18 +9,40 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SearchProductLtoH(c *gin.Context) {
+func SearchProducts(c *gin.Context) {
 	var products []models.Product
+	var productResponse []models.ProductResponse
 
 	categoryID := c.Query("category_id")
+	sortBy := c.Query("sort_by")
+	filterAvailable := c.Query("available")
 
-	query := database.DB.Where("availability = ?", true)
+	query := database.DB.Model(&products)
 
-	if categoryID != "" {
-		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
+	if filterAvailable == "true" {
+		query = query.Where("availability = ?", true)
 	}
 
-	tx := query.Order("offer_amount ASC").Find(&products)
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
+	}
+
+	switch sortBy {
+	case "price_asc":
+		query = query.Order("offer_amount ASC")
+	case "price_desc":
+		query = query.Order("offer_amount DESC")
+	case "newest":
+		query = query.Order("created_at DESC")
+	case "name_asc":
+		query = query.Order("LOWER(name) ASC")
+	case "name_desc":
+		query = query.Order("LOWER(name) DESC")
+	case "high_rating":
+		query = query.Joins("JOIN sellers ON sellers.id = products.seller_id").Order("sellers.average_rating DESC")
+	}
+
+	tx := query.Find(&products)
 	if tx.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "failed",
@@ -28,8 +50,6 @@ func SearchProductLtoH(c *gin.Context) {
 		})
 		return
 	}
-
-	var productResponse []models.ProductResponse
 
 	for _, product := range products {
 		var seller models.Seller
@@ -56,281 +76,7 @@ func SearchProductLtoH(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "successfully retrieved products sorted by price",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
-func SearchProductHtoL(c *gin.Context) {
-	var products []models.Product
-
-	categoryID := c.Query("category_id")
-
-	query := database.DB.Where("availability = ?", true)
-
-	if categoryID != "" {
-		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
-	}
-
-	tx := query.Order("offer_amount DESC").Find(&products)
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the products database, or the data doesn't exist",
-		})
-		return
-	}
-
-	var productResponse []models.ProductResponse
-
-	for _, product := range products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products sorted by price",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
-func SearchProductNew(c *gin.Context) {
-	var products []models.Product
-
-	categoryID := c.Query("category_id")
-
-	query := database.DB.Where("availability = ?", true)
-
-	if categoryID != "" {
-		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
-	}
-
-	tx := query.Order("products.created_at DESC").Find(&products)
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the products database, or the data doesn't exist",
-		})
-		return
-	}
-
-	var productResponse []models.ProductResponse
-
-	for _, product := range products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products sorted by new arrival",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
-func SearchProductAtoZ(c *gin.Context) {
-	var products []models.Product
-
-	categoryID := c.Query("category_id")
-
-	query := database.DB.Where("availability = ?", true)
-
-	if categoryID != "" {
-		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
-	}
-
-	tx := query.Order("LOWER(products.name) ASC").Find(&products)
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the products database, or the data doesn't exist",
-		})
-		return
-	}
-
-	var productResponse []models.ProductResponse
-
-	for _, product := range products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products sorted by alphabetic order",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
-func SearchProductZtoA(c *gin.Context) {
-	var products []models.Product
-
-	categoryID := c.Query("category_id")
-
-	query := database.DB.Where("availability = ?", true)
-
-	if categoryID != "" {
-		query = query.Where("category_id = ? AND availability = ?", categoryID, true)
-	}
-
-	tx := query.Order("LOWER(products.name) DESC").Find(&products)
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the products database, or the data doesn't exist",
-		})
-		return
-	}
-
-	var productResponse []models.ProductResponse
-
-	for _, product := range products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products sorted by reverce alphbetic order",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
-func SearchProductHighRatedFirst(c *gin.Context) {
-	var products []models.Product
-
-	categoryID := c.Query("category_id")
-
-	query := database.DB.
-		Joins("JOIN sellers ON sellers.id = products.seller_id").
-		Where("products.availability = ?", true)
-
-	if categoryID != "" {
-		query = query.Where("products.category_id = ?", categoryID)
-	}
-
-	tx := query.Order("sellers.average_rating DESC").Find(&products)
-
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the products database, or the data doesn't exist",
-		})
-		return
-	}
-
-	var productResponse []models.ProductResponse
-
-	for _, product := range products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products sorted by seller's high ratings",
+		"message": "successfully retrieved products",
 		"data": gin.H{
 			"products": productResponse,
 		},
@@ -425,7 +171,6 @@ func TopSellingProduct(c *gin.Context) {
 }
 
 func TopSellingCategory(c *gin.Context) {
-	// Retrieve sellerID from context
 	sellerID, exists := c.Get("sellerID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -435,7 +180,6 @@ func TopSellingCategory(c *gin.Context) {
 		return
 	}
 
-	// Check if sellerID is of type uint
 	sellerIDUint, ok := sellerID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{

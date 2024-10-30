@@ -389,51 +389,6 @@ func SellerIdbyProductId(ProductId uint) uint {
 	return Product.SellerID
 }
 
-func ListAllProduct(c *gin.Context) {
-	var Products []models.Product
-
-	tx := database.DB.Select("*").Find(&Products)
-	if tx.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "failed",
-			"message": "failed to retrieve data from the database, or the product doesn't exist",
-		})
-		return
-	}
-	var productResponse []models.ProductResponse
-
-	for _, product := range Products {
-		var seller models.Seller
-		if err := database.DB.Where("id = ?", product.SellerID).Select("average_rating").First(&seller).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "failed",
-				"message": "failed to retrieve seller rating",
-			})
-			return
-		}
-		productResponse = append(productResponse, models.ProductResponse{
-			ID:           product.ID,
-			Name:         product.Name,
-			Description:  product.Description,
-			Price:        product.Price,
-			OfferAmount:  product.OfferAmount,
-			Image:        product.Image,
-			Availability: product.Availability,
-			SellerID:     product.SellerID,
-			CategoryID:   product.CategoryID,
-			SellerRating: seller.AverageRating,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "successfully retrieved products",
-		"data": gin.H{
-			"products": productResponse,
-		},
-	})
-}
-
 func AddProductOffer(c *gin.Context) {
 	sellerID, exists := c.Get("sellerID")
 	if !exists {

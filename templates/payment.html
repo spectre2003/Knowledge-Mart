@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,54 +11,107 @@
     </form>
     
     <script>
-function makePayment() {
-    let orderID = "{{ .orderID }}"; // Use the passed orderID from Go
+        let paymentFailureHandled = false;
+        
+        function makePayment() {
+            let orderID = "{{ .orderID }}"; 
+            console.log("Order ID:", orderID); 
 
-    fetch(`http://localhost:8080/create-order/${orderID}`, {
-        method: 'POST',
-    })
-    .then(response => response.json())
-    .then(data => {
-        var options = {
-            "key": "rzp_test_NgYSGyXz1Y5e5c",  // Enter the Key ID from Razorpay Dashboard
-            "amount": data.amount,  // Amount is in paise
-            "currency": data.currency,
-            "name": "Knowledge-Mart",
-            "description": "Razorpay",
-            "order_id": data.order_id,  // Order ID from the API response
-            "handler": function (response) {
-                fetch(`http://localhost:8080/verify-payment/${orderID}`, {
+            fetch(`http://localhost:8080/check-failed-attempts/${orderID}`, {
+                method: 'GET',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.failed_attempts >= 3) {
+                    alert("Payment cannot be processed after multiple failed attempts. Please contact support.");
+                    return; 
+                }
+
+                fetch(`http://localhost:8080/create-order/${orderID}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_order_id: data.order_id,
-                        razorpay_signature: response.razorpay_signature
-                    })
                 })
                 .then(response => response.json())
                 .then(data => {
-                    alert(data.status);
+                    console.log("Order created:", data);
+                    
+                    var options = {
+                        "key": "rzp_test_NgYSGyXz1Y5e5c", 
+                        "amount": data.amount,  
+                        "currency": data.currency,
+                        "name": "Knowledge-Mart",
+                        "description": "Razorpay",
+                        "order_id": data.order_id,
+                        
+                        "handler": function (response) {
+                            console.log("Payment succeeded:", response);
+                            paymentFailureHandled = false; 
+                            fetch(`http://localhost:8080/verify-payment/${orderID}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_order_id: data.order_id,
+                                    razorpay_signature: response.razorpay_signature
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === "success") {
+                                    alert("Payment successful!");
+                                } else {
+                                    alert("Payment verification failed.");
+                                }
+                            })
+                            .catch(error => console.error('Error verifying payment:', error));
+                        },
+
+                        "modal": {
+                            "ondismiss": function () {
+                                console.log("Payment modal dismissed");
+                                handlePaymentFailure("User dismissed the payment or payment failed");
+                            }
+                        }
+                    };
+        
+                    var rzp1 = new Razorpay(options);
+                    rzp1.on('payment.failed', function (response) {
+                        console.log("Payment failed:", response);
+                        handlePaymentFailure("Payment failed due to an issue with Razorpay.");
+                    });
+                    rzp1.open();
                 })
-                .catch(error => console.error('Error verifying payment:', error));
-            },
-            "prefill": {
-                "name": "Knowledge-Mart",
-                "email": "knowledgemartv01@gmail.com",
-                "contact": "6282242522"
-            }
-        };
-
-        var rzp1 = new Razorpay(options);
-        rzp1.open();
-    })
-    .catch(error => console.error('Error creating order:', error));
-}
-
-
+                .catch(error => console.error('Error creating order:', error));
+            })
+            .catch(error => console.error('Error checking failed attempts:', error));
+        }
+        
+        function handlePaymentFailure(reason) {
+            if (paymentFailureHandled) return;
+            paymentFailureHandled = true; 
+        
+            let orderID = "{{ .orderID }}"; 
+            fetch(`http://localhost:8080/payment-failed/${orderID}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason: reason })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "failed" && data.message.includes("marked as failed")) {
+                    alert("Payment cannot be processed after multiple failed attempts. Please contact support.");
+                    document.getElementById("paymentForm").innerHTML = "<p>Payment cannot be processed after multiple failed attempts.</p>";
+                } else {
+                    alert("Payment failed. Please try again.");
+                }
+            })
+            .catch(error => console.error('Error handling payment failure:', error));
+        }
     </script>
+    
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </body>
 </html>

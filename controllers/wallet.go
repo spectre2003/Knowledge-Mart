@@ -284,8 +284,8 @@ func ProcessWalletPayment(userID uint, orderIDStr string, tx *gorm.DB) (models.U
 	payment := models.Payment{
 		OrderID:         orderIDStr,
 		WalletPaymentID: newUserWallet.WalletPaymentID,
-		PaymentGateway:  "wallet",
-		PaymentStatus:   "PAID",
+		PaymentGateway:  models.Wallet,
+		PaymentStatus:   models.PaymentStatusPaid,
 	}
 	if err := tx.Create(&payment).Error; err != nil {
 		tx.Rollback()

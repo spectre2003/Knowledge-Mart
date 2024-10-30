@@ -302,6 +302,12 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) b
 
 		finalPrice = math.Max(0, finalPrice)
 
+		orderStatus := models.OrderStatusPending
+
+		if Order.PaymentMethod == models.COD {
+			orderStatus = models.OrderStatusConfirmed
+		}
+
 		orderItem := models.OrderItem{
 			OrderID:             Order.OrderID,
 			ProductID:           cartItem.ProductID,
@@ -312,7 +318,7 @@ func CartToOrderItems(UserID uint, Order models.Order, CouponDiscount float64) b
 			CategoryOfferAmount: RoundDecimalValue(categoryOffer),
 			OtherOffers:         RoundDecimalValue(proportionalDiscount),
 			FinalAmount:         RoundDecimalValue(finalPrice),
-			Status:              models.OrderStatusPending,
+			Status:              orderStatus,
 		}
 
 		if err := tx.Create(&orderItem).Error; err != nil {
@@ -531,6 +537,7 @@ func SellerUpdateOrderStatus(c *gin.Context) {
 
 	if allDelivered {
 		order.Status = models.OrderStatusDelivered
+		order.PaymentStatus = models.PaymentStatusPaid
 	} else if allPending {
 		order.Status = models.OrderStatusPending
 	} else if allConfirmed {
@@ -941,6 +948,14 @@ func ReturnOrder(c *gin.Context) {
 			return
 		}
 
+		if orderItem.Status != models.OrderStatusDelivered {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "item not delivered yet",
+			})
+			return
+		}
+
 		if orderItem.Status == models.OrderStatusReturned {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "failed",
@@ -1026,6 +1041,14 @@ func ReturnOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",
 			"message": "this order is already returned",
+		})
+		return
+	}
+
+	if orders.Status != models.OrderStatusDelivered {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "order is not delivered yet",
 		})
 		return
 	}

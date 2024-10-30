@@ -35,16 +35,9 @@ func RegisterRoutes(router *gin.Engine) {
 	//seller auth
 	router.POST("/seller_login", controllers.SellerLogin)
 
-	//products
-	router.GET("/all_products", controllers.ListAllProduct)
+	//products search
+	router.GET("/product/search", controllers.SearchProducts)
 	router.GET("/all_category", controllers.ListAllCategory)
-	router.GET("/product_category", controllers.ListCategoryProductList)
-	router.GET("/product_price_lowtohigh", controllers.SearchProductLtoH)
-	router.GET("/product_price_hightolow", controllers.SearchProductHtoL)
-	router.GET("/product_new", controllers.SearchProductNew)
-	router.GET("/product_a_to_z", controllers.SearchProductAtoZ)
-	router.GET("/product_z_to_a", controllers.SearchProductZtoA)
-	router.GET("/product_popularity", controllers.SearchProductHighRatedFirst)
 
 	//coupon
 	router.GET("/coupon/all", controllers.GetAllCoupons)
@@ -102,8 +95,10 @@ func RegisterRoutes(router *gin.Engine) {
 	}
 	//razorpay
 	router.POST("/verify-payment/:orderID", controllers.VerifyPayment)
+	router.POST("/payment-failed/:orderID", controllers.HandleFailedPayment)
 	router.GET("/payment_method", controllers.RenderRazorpay)
 	router.POST("/create-order/:orderID", controllers.CreateOrder)
+	router.GET("/check-failed-attempts/:orderID", controllers.CheckFailedAttempts)
 
 	sellerRoutes := router.Group("/seller")
 	sellerRoutes.Use(middleware.AuthRequired)
