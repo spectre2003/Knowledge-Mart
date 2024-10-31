@@ -140,6 +140,7 @@ type UserOrderResponse struct {
 	ShippingAddress ShippingAddress     `json:"shippingAddress"`
 	Status          string              `json:"orderStatus"`
 	PaymentStatus   string              `json:"paymentStatus"`
+	PaymentMethod   string              `json:"paymentMethod"`
 	Items           []OrderItemResponse `json:"items"`
 	ItemCounts      gin.H               `json:"item_counts"`
 }
@@ -179,4 +180,14 @@ type AmountInformation struct {
 	TotalProuctOfferDeduction   float64 `json:"total_product_offer_deduction"`
 	TotalDeliveryCharges        float64 `json:"total_delivery_charge"`
 	TotalAmountAfterDeduction   float64 `json:"total_amount_after_deduction"`
+}
+
+type NoteResponse struct {
+	NoteID         uint   `json:"note_id"`
+	UserID         uint   `json:"user_id"`
+	CourseName     string `json:"course_name"`
+	SemesterNumber int    `json:"semester_number"`
+	SubjectName    string `json:"subject_name"`
+	Description    string `json:"description"`
+	FileURL        string `json:"file_url"`
 }

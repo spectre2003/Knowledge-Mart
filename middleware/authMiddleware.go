@@ -11,7 +11,7 @@ import (
 
 func AuthRequired(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
-	fmt.Println("Authorization Header:", authHeader)
+	//fmt.Println("Authorization Header:", authHeader)
 
 	if authHeader == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -40,8 +40,6 @@ func AuthRequired(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	fmt.Println(tokenString)
-	fmt.Println("Extracted UserID:", claims.ID)
 
 	switch claims.Role {
 	case "user":

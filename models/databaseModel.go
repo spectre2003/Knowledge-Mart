@@ -210,3 +210,33 @@ type OrderDateCount struct {
 	Date  time.Time `json:"date"`
 	Count int64     `json:"count"`
 }
+
+type Course struct {
+	CourseID  uint       `gorm:"primary_key" json:"course_id"`
+	Name      string     `gorm:"type:varchar(55);not null" json:"course_name"`
+	Semesters []Semester `gorm:"foreignKey:CourseID" json:"semesters"`
+}
+
+type Semester struct {
+	SemesterID uint      `gorm:"primary_key" json:"semester_id"`
+	CourseID   uint      `gorm:"not null" json:"course_id"`
+	Number     int       `gorm:"not null" json:"semester_number"`
+	Subjects   []Subject `gorm:"foreignKey:SemesterID" json:"subjects"`
+}
+
+type Subject struct {
+	SubjectID  uint   `gorm:"primary_key" json:"subject_id"`
+	CourseID   uint   `gorm:"not null" json:"course_id"`
+	SemesterID uint   `gorm:"not null" json:"semester_id"`
+	Name       string `gorm:"type:varchar(55);not null" json:"name"`
+}
+
+type Note struct {
+	NoteID      uint   `gorm:"primary_key" json:"note_id"`
+	UserID      uint   `gorm:"not null" json:"user_id"`
+	CourseID    uint   `gorm:"not null" json:"course_id"`
+	SemesterID  uint   `gorm:"not null" json:"semester_id"`
+	SubjectID   uint   `gorm:"not null" json:"subject_id"`
+	Description string `json:"description"`
+	FileURL     string `gorm:"type:text" json:"file_url"`
+}

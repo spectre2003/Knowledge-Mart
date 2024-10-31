@@ -2,18 +2,31 @@ package database
 
 import (
 	"fmt"
-	"knowledgeMart/models"
-
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"knowledgeMart/models"
+	"log"
+	"os"
 )
 
 var DB *gorm.DB
 
 func ConnectDB() {
-	var err error
-	dsn := fmt.Sprintf("host=127.0.0.1 user=postgres password=password dbname=knowledgemart port=5432 sslmode=disable")
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_SSLMODE"),
+	)
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
@@ -21,18 +34,22 @@ func ConnectDB() {
 	if err != nil {
 		panic("failed to connect to database")
 	} else {
-		fmt.Println("connection to database :OK")
+		fmt.Println("Connection to database: OK")
 	}
+
 	err = DB.AutoMigrate(
 		&models.Admin{},
 		&models.User{},
+		&models.Course{},
 		&models.Seller{},
 		&models.Product{},
 		&models.Category{},
 		&models.Address{},
 		&models.Cart{},
-		&models.SellerRating{},
 		&models.Order{},
+		&models.Semester{},
+		&models.SellerRating{},
+		&models.Subject{},
 		&models.WhishList{},
 		&models.Payment{},
 		&models.UserWallet{},
@@ -40,15 +57,10 @@ func ConnectDB() {
 		&models.CouponInventory{},
 		&models.CouponUsage{},
 		&models.UserReferralHistory{},
+		&models.OrderItem{},
+		&models.Note{},
 	)
 	if err != nil {
 		fmt.Println("Migration failed:", err)
 	}
-	err = DB.AutoMigrate(
-		&models.OrderItem{},
-	)
-	if err != nil {
-		fmt.Println("Migration failed for OrderItem:", err)
-	}
-
 }

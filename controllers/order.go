@@ -665,6 +665,7 @@ func UserCheckOrderStatus(c *gin.Context) {
 			Items:           orderItemResponses,
 			Status:          order.Status,
 			PaymentStatus:   order.PaymentStatus,
+			PaymentMethod:   order.PaymentMethod,
 			ShippingAddress: order.ShippingAddress,
 			ItemCounts:      statusCounts,
 		})

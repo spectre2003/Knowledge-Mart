@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -22,20 +23,25 @@ func InitCloudinary() (*cloudinary.Cloudinary, error) {
 	return cld, nil
 }
 
-func UploadFileToCloudinary(filePath string) (string, error) {
-	cld, err := InitCloudinary()
-	if err != nil {
-		return "", err
+func UploadFileToCloudinary(filePath string, resourceType string) (string, error) {
+	cloudName := os.Getenv("CLOUDNAME")
+	apiKey := os.Getenv("CLOUDINARYACCESSKEY")
+	apiSecret := os.Getenv("CLOUDINARYSECRETKEY")
+
+	if cloudName == "" || apiKey == "" || apiSecret == "" {
+		return "", fmt.Errorf("cloudinary configuration is missing in environment variables")
 	}
 
-	ctx := context.Background()
+	cld, err := cloudinary.NewFromParams(cloudName, apiKey, apiSecret)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cloudinary instance: %w", err)
+	}
 
-	// Make sure to set ResourceType to "raw"
-	uploadResult, err := cld.Upload.Upload(ctx, filePath, uploader.UploadParams{
-		ResourceType: "raw", // This is important for PDF and non-image files
+	uploadResult, err := cld.Upload.Upload(context.TODO(), filePath, uploader.UploadParams{
+		ResourceType: resourceType,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to upload file to cloudinary: %w", err)
 	}
 
 	return uploadResult.SecureURL, nil

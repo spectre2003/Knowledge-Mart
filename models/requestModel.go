@@ -149,3 +149,19 @@ type AddOfferRequest struct {
 	ProductID   uint    `json:"product_id" binding:"required"`
 	OfferAmount float64 `json:"offer_amount" binding:"required"`
 }
+
+type CreateNoteSharing struct {
+	Name string `json:"name" validate:"required"`
+}
+
+type SemesterRequest struct {
+	Number int `json:"number" validate:"required"`
+}
+
+type UploadNote struct {
+	CourseID    uint   `json:"course_id" validate:"required"`
+	SemesterID  uint   `json:"semester_id" validate:"required"`
+	SubjectID   uint   `json:"subject_id" validate:"required"`
+	Description string `json:"description" validate:"required"`
+	FileURL     string `json:"file_url" validate:"required"`
+}

@@ -18,106 +18,107 @@ func RegisterRoutes(router *gin.Engine) {
 	})
 
 	//admin auth
-	router.POST("/admin_login", controllers.AdminLogin)
+	router.POST("/api/v1/admin/login", controllers.AdminLogin)
 
 	//user auth
-	router.POST("/user_signup", controllers.EmailSignup)
-	router.POST("/user_login", controllers.EmailLogin)
+	router.POST("/api/v1/user/signup", controllers.EmailSignup)
+	router.POST("/api/v1/user/login", controllers.EmailLogin)
 
 	//user google auth
 	router.GET("/api/v1/googlelogin", controllers.GoogleHandleLogin)
 	router.GET("/api/v1/googlecallback", controllers.GoogleHandleCallback)
 
 	//email varification
-	router.GET("/verifyemail/:email/:otp", controllers.VarifyEmail)
-	router.POST("/resend_otp/:email", controllers.ResendOTP)
+	router.GET("/api/v1/verifyemail/:email/:otp", controllers.VarifyEmail)
+	router.POST("/api/v1/otp/resend/:email", controllers.ResendOTP)
 
 	//seller auth
-	router.POST("/seller_login", controllers.SellerLogin)
+	router.POST("/api/v1/seller/login", controllers.SellerLogin)
 
 	//products search
-	router.GET("/product/search", controllers.SearchProducts)
-	router.GET("/all_category", controllers.ListAllCategory)
+	router.GET("/api/v1/public/product/search", controllers.SearchProducts)
+	router.GET("/api/v1/public/category/all", controllers.ListAllCategory)
 
 	//coupon
-	router.GET("/coupon/all", controllers.GetAllCoupons)
+	router.GET("/api/v1/public/coupon/all", controllers.GetAllCoupons)
 
-	userRoutes := router.Group("/user")
+	//course & notes
+	router.GET("/api/v1/public/course/all", controllers.GetAllCoursesWithDetails)
+	router.GET("/api/v1/public/notes/all", controllers.GetAllNotes)
+
+	userRoutes := router.Group("/api/v1/user")
 	userRoutes.Use(middleware.AuthRequired)
 	{
-		userRoutes.POST("/seller_registration", controllers.SellerRegister)
+		userRoutes.POST("/seller/registration", controllers.SellerRegister)
 
 		//address
-		userRoutes.POST("/add_address", controllers.AddAddress)
-		userRoutes.GET("/get_address", controllers.ListAllAddress)
-		userRoutes.PUT("/edit_address", controllers.EditAddress)
-		userRoutes.DELETE("/delete_address", controllers.DeleteAddress)
+		userRoutes.POST("/address/create", controllers.AddAddress)
+		userRoutes.GET("/address/get", controllers.ListAllAddress)
+		userRoutes.PUT("/address/edit", controllers.EditAddress)
+		userRoutes.DELETE("/address/delete", controllers.DeleteAddress)
 
 		//profile
-		userRoutes.GET("/user_profile", controllers.GetUserProfile)
-		userRoutes.PUT("/edit_user_profile", controllers.EditUserProfile)
-		userRoutes.PATCH("/edit_user_password", controllers.EditPassword)
+		userRoutes.GET("/profile", controllers.GetUserProfile)
+		userRoutes.PUT("/profile/edit", controllers.EditUserProfile)
+		userRoutes.PATCH("/password/edit", controllers.EditPassword)
 
 		//cart
-		userRoutes.POST("/add_to_cart", controllers.AddToCart)
-		userRoutes.GET("/cart_view", controllers.ListAllCart)
-		userRoutes.DELETE("/remove_cart", controllers.RemoveItemFromCart)
+		userRoutes.POST("/cart/add", controllers.AddToCart)
+		userRoutes.GET("/cart/view", controllers.ListAllCart)
+		userRoutes.DELETE("/cart/remove", controllers.RemoveItemFromCart)
 		userRoutes.GET("/coupon/cart", controllers.ApplyCouponOnCart)
-		//userRoutes.GET("/referral/cart", controllers.ApplyReferralOnCart)
 
 		//order
-		userRoutes.POST("/order_place", controllers.PlaceOrder)
-		userRoutes.GET("/my_orders", controllers.UserCheckOrderStatus)
-		userRoutes.PATCH("/order_cancel", controllers.CancelOrder)
-		userRoutes.PATCH("/order_return", controllers.ReturnOrder)
+		userRoutes.POST("/order/create", controllers.PlaceOrder)
+		userRoutes.GET("/order/check", controllers.UserCheckOrderStatus)
+		userRoutes.PATCH("/order/cancel", controllers.CancelOrder)
+		userRoutes.PATCH("/order/return", controllers.ReturnOrder)
 		userRoutes.GET("/order/invoice", controllers.OrderInvoice)
 
 		//note sharing
-		userRoutes.POST("/file_upload", controllers.UploadFile)
+		userRoutes.POST("/file/upload", controllers.UploadFile)
+		userRoutes.POST("/note/upload", controllers.UploadNote)
+		userRoutes.PATCH("/note/edit", controllers.EditNote)
+		userRoutes.DELETE("/note/delete", controllers.DeleteNote)
+		userRoutes.GET("/note/view", controllers.GetUserNotes)
 
 		//rating
-		userRoutes.POST("/seller_rating", controllers.SellerRating)
+		userRoutes.POST("/seller-rating", controllers.SellerRating)
 
 		//whishlist
-		userRoutes.POST("/add_to_whishlist", controllers.AddToWhishList)
-		userRoutes.GET("/whishlist_view", controllers.ListAllWhishList)
-		userRoutes.DELETE("/remove_whishlist", controllers.RemoveItemFromwhishlist)
+		userRoutes.POST("/whishlist/add", controllers.AddToWhishList)
+		userRoutes.GET("/whishlist/view", controllers.ListAllWhishList)
+		userRoutes.DELETE("/whishlist/remove", controllers.RemoveItemFromwhishlist)
 
 		//wallet history
 		userRoutes.GET("/wallet/history", controllers.GetUserWalletHistory)
 
-		// userRoutes.GET("/payment_method", controllers.RenderRazorpay)
-		// userRoutes.POST("/create-order", controllers.CreateOrder)
-		// userRoutes.POST("/verify-payment", controllers.VerifyPayment)
-
-		//wallet
-		//userRoutes.POST("/wallet_payment", controllers.WalletPayment)
 	}
 	//razorpay
 	router.POST("/verify-payment/:orderID", controllers.VerifyPayment)
 	router.POST("/payment-failed/:orderID", controllers.HandleFailedPayment)
-	router.GET("/payment_method", controllers.RenderRazorpay)
+	router.GET("/payment-method", controllers.RenderRazorpay)
 	router.POST("/create-order/:orderID", controllers.CreateOrder)
 	router.GET("/check-failed-attempts/:orderID", controllers.CheckFailedAttempts)
 
-	sellerRoutes := router.Group("/seller")
+	sellerRoutes := router.Group("/api/v1/seller")
 	sellerRoutes.Use(middleware.AuthRequired)
 	{
 		//products
-		sellerRoutes.POST("/add_product", controllers.AddProduct)
-		sellerRoutes.PUT("/edit_product", controllers.EditProduct)
-		sellerRoutes.DELETE("/delete_product", controllers.DeleteProduct)
+		sellerRoutes.POST("/product/add", controllers.AddProduct)
+		sellerRoutes.PUT("/product/edit", controllers.EditProduct)
+		sellerRoutes.DELETE("/product/delete", controllers.DeleteProduct)
+		sellerRoutes.GET("/product/view", controllers.ListProductBySeller)
 
 		//profile
-		sellerRoutes.GET("/seller_profile", controllers.GetSellerProfile)
-		sellerRoutes.PUT("/edit_seller", controllers.EditSellerProfile)
-		sellerRoutes.PATCH("/edit_seller_password", controllers.EditSellerPassword)
-		sellerRoutes.GET("/product_by_seller", controllers.ListProductBySeller)
+		sellerRoutes.GET("/profile", controllers.GetSellerProfile)
+		sellerRoutes.PUT("/profile/edit", controllers.EditSellerProfile)
+		sellerRoutes.PATCH("/password/edit", controllers.EditSellerPassword)
 
 		//order
-		sellerRoutes.GET("/order_list", controllers.GetUserOrders)
-		sellerRoutes.PATCH("/update_order_status", controllers.SellerUpdateOrderStatus)
-		sellerRoutes.PATCH("/order_cancel", controllers.CancelOrder)
+		sellerRoutes.GET("/order/view", controllers.GetUserOrders)
+		sellerRoutes.PATCH("/order/status/update", controllers.SellerUpdateOrderStatus)
+		sellerRoutes.PATCH("/order/status/cancel", controllers.CancelOrder)
 
 		//sales report
 		sellerRoutes.GET("/report/all", controllers.SellerOverAllSalesReport)
@@ -133,29 +134,45 @@ func RegisterRoutes(router *gin.Engine) {
 
 	}
 
-	adminRoutes := router.Group("/admin")
+	adminRoutes := router.Group("/api/v1/admin")
 	adminRoutes.Use(middleware.AuthRequired)
 	{
 		//category
-		adminRoutes.POST("/add_category", controllers.AddCatogory)
-		adminRoutes.PUT("/edit_category", controllers.EditCategory)
-		adminRoutes.DELETE("/delete_category", controllers.DeleteCategory)
+		adminRoutes.POST("/category/add", controllers.AddCatogory)
+		adminRoutes.PUT("/category/edit", controllers.EditCategory)
+		adminRoutes.DELETE("/category/delete", controllers.DeleteCategory)
 
 		//user management
-		adminRoutes.GET("/all_users", controllers.ListAllUsers)
-		adminRoutes.GET("/list_blocked_users", controllers.ListBlockedUsers)
-		adminRoutes.PATCH("/block_user", controllers.BlockUser)
-		adminRoutes.PATCH("/unblock_user", controllers.UnBlockUser)
+		adminRoutes.GET("/view/users", controllers.ListAllUsers)
+		adminRoutes.GET("/view/blocked-users", controllers.ListBlockedUsers)
+		adminRoutes.PATCH("/block/user", controllers.BlockUser)
+		adminRoutes.PATCH("/unblock/user", controllers.UnBlockUser)
 
 		//seller management
-		adminRoutes.GET("/all_seller", controllers.ListAllSellers)
-		adminRoutes.PATCH("/verify_seller", controllers.VerifySeller)
-		adminRoutes.PATCH("/not_verified_seller", controllers.NotVerifySeller)
+		adminRoutes.GET("/view/sellers", controllers.ListAllSellers)
+		adminRoutes.PATCH("/verify/seller", controllers.VerifySeller)
+		adminRoutes.PATCH("/un-verify/seller", controllers.NotVerifySeller)
 
 		//Coupon management
 		adminRoutes.POST("/coupon/create", controllers.CreateCoupen)
 		adminRoutes.PATCH("/coupon/update", controllers.UpdateCoupon)
 		adminRoutes.DELETE("/coupon/delete", controllers.DeleteCoupon)
+
+		//course management
+		adminRoutes.POST("/course/create", controllers.CreateCourse)
+		adminRoutes.PATCH("/course/edit", controllers.EditCourse)
+		adminRoutes.DELETE("/course/delete", controllers.DeleteCourse)
+
+		//semester management
+		adminRoutes.POST("/semester/create", controllers.CreateSemester)
+		adminRoutes.PATCH("/semester/edit", controllers.EditSemester)
+		adminRoutes.DELETE("/semester/delete", controllers.DeleteSemester)
+
+		//subject management
+		adminRoutes.POST("/subject/create", controllers.CreateSubject)
+		adminRoutes.PATCH("/subject/edit", controllers.EditSubject)
+		adminRoutes.DELETE("/subject/delete", controllers.DeleteSubject)
+
 	}
 
 }

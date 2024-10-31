@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"knowledgeMart/utils"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,24 +13,37 @@ import (
 func UploadFile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "failed", "message": "User not authorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "failed",
+			"message": "User not authorized",
+		})
 		return
 	}
 
 	_, ok := userID.(uint)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to retrieve user information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Failed to retrieve user information",
+		})
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "failed", "message": "File is required"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "File is required",
+			"error":   err.Error(),
+		})
 		return
 	}
 
 	if filepath.Ext(file.Filename) != ".pdf" {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "failed", "message": "Only PDF files are allowed"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Only PDF files are allowed",
+		})
 		return
 	}
 
@@ -37,26 +51,53 @@ func UploadFile(c *gin.Context) {
 	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
 		err := os.Mkdir(tempDir, os.ModePerm)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Unable to create temp directory"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "failed",
+				"message": "Unable to create temp directory",
+				"error":   err.Error(),
+			})
 			return
 		}
 	}
-	tempFilePath := filepath.Join(tempDir, file.Filename) // Use Join for better path handling
+
+	tempFilePath := filepath.Join(tempDir, file.Filename)
 	err = c.SaveUploadedFile(file, tempFilePath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Unable to save file temporarily"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Unable to save file temporarily",
+			"error":   err.Error(),
+		})
 		return
 	}
 
-	secureURL, err := utils.UploadFileToCloudinary(tempFilePath)
+	if _, err := os.Stat(tempFilePath); os.IsNotExist(err) {
+		log.Println("Temporary file does not exist:", tempFilePath)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Temporary file not found",
+		})
+		return
+	}
+
+	secureURL, err := utils.UploadFileToCloudinary(tempFilePath, "raw")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to upload file to cloud"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Failed to upload file to cloud",
+			"error":   err.Error(),
+		})
 		return
 	}
 
-	// Clean up the temporary file
+	log.Println("File uploaded to Cloudinary:", secureURL)
+
 	if err := os.Remove(tempFilePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "failed", "message": "Failed to clean up temp file"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "failed",
+			"message": "Failed to clean up temp file",
+			"error":   err.Error(),
+		})
 		return
 	}
 
