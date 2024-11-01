@@ -32,10 +32,10 @@ func ConnectDB() {
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
-		panic("failed to connect to database")
-	} else {
-		fmt.Println("Connection to database: OK")
+		log.Fatalf("failed to connect to database: %v", err)
 	}
+
+	fmt.Println("Connection to database: OK")
 
 	err = DB.AutoMigrate(
 		&models.Admin{},
@@ -46,7 +46,6 @@ func ConnectDB() {
 		&models.Category{},
 		&models.Address{},
 		&models.Cart{},
-		&models.Order{},
 		&models.Semester{},
 		&models.SellerRating{},
 		&models.Subject{},
@@ -57,10 +56,13 @@ func ConnectDB() {
 		&models.CouponInventory{},
 		&models.CouponUsage{},
 		&models.UserReferralHistory{},
-		&models.OrderItem{},
 		&models.Note{},
+		&models.Order{},
+		&models.OrderItem{},
 	)
 	if err != nil {
 		fmt.Println("Migration failed:", err)
+	} else {
+		fmt.Println("Migrations: OK")
 	}
 }

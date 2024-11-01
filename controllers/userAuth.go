@@ -133,7 +133,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT using userID
 	tokenstring, err := utils.GenerateJWT(existingUser.ID, "user")
 	if tokenstring == "" || err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -143,7 +142,6 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Return success response with JWT and user info
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "login successful",

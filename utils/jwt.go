@@ -22,7 +22,6 @@ func init() {
 type JWTClaims struct {
 	ID   uint   `json:"userId"`
 	Role string `json:"role"`
-	//Email string `json:"email"`
 	jwt.RegisteredClaims
 }
 
@@ -32,18 +31,15 @@ func GenerateJWT(userID uint, role string) (string, error) {
 	expirationTime := time.Now().Add(150 * time.Hour)
 
 	fmt.Println("user id :", userID)
-	//fmt.Println("user id :", email)
 
 	claims := &JWTClaims{
-		ID: userID,
-		//	Email:  email,
+		ID:   userID,
 		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	//fmt.Println("user id :", claims.UserID, claims.Email)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(secret))
