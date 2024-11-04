@@ -125,9 +125,9 @@ type ShippingAddress struct {
 }
 
 type OrderItem struct {
-	OrderItemID         uint    `gorm:"primaryKey;autoIncrement" json:"orderItemId"`
-	OrderID             uint    `gorm:"not null" json:"orderId"`
-	Order               Order   `gorm:"foreignKey:OrderID"`
+	OrderItemID uint `gorm:"primaryKey;autoIncrement" json:"orderItemId"`
+	OrderID     uint `gorm:"not null" json:"orderId"`
+	//Order               Order   `gorm:"foreignKey:OrderID"`
 	UserID              uint    `gorm:"not null" json:"userId"`
 	User                User    `gorm:"foreignKey:UserID"`
 	ProductID           uint    `gorm:"not null" json:"productId"`

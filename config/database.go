@@ -2,13 +2,14 @@ package database
 
 import (
 	"fmt"
+	"knowledgeMart/models"
+	"log"
+	"os"
+
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"knowledgeMart/models"
-	"log"
-	"os"
 )
 
 var DB *gorm.DB
