@@ -17,7 +17,7 @@
             let orderID = "{{ .orderID }}"; 
             console.log("Order ID:", orderID); 
 
-            fetch(`http://localhost:8080/check-failed-attempts/${orderID}`, {
+            fetch(`https://www.knowledgemart.online/check-failed-attempts/${orderID}`, {
                 method: 'GET',
             })
             .then(response => response.json())
@@ -27,7 +27,7 @@
                     return; 
                 }
 
-                fetch(`http://localhost:8080/create-order/${orderID}`, {
+                fetch(`https://www.knowledgemart.online/create-order/${orderID}`, {
                     method: 'POST',
                 })
                 .then(response => response.json())
@@ -45,7 +45,7 @@
                         "handler": function (response) {
                             console.log("Payment succeeded:", response);
                             paymentFailureHandled = false; 
-                            fetch(`http://localhost:8080/verify-payment/${orderID}`, {
+                            fetch(`https://www.knowledgemart.online/verify-payment/${orderID}`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json'
@@ -92,7 +92,7 @@
             paymentFailureHandled = true; 
         
             let orderID = "{{ .orderID }}"; 
-            fetch(`http://localhost:8080/payment-failed/${orderID}`, {
+            fetch(`https://www.knowledgemart.online/payment-failed/${orderID}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
