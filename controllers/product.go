@@ -48,6 +48,14 @@ func AddProduct(c *gin.Context) {
 		return
 	}
 
+	if request.OfferAmount > request.Price {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "offer price cannot be greater than actual price",
+		})
+		return
+	}
+
 	var category models.Category
 	if err := database.DB.First(&category, request.CategoryID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -219,6 +227,14 @@ func EditProduct(c *gin.Context) {
 
 	if Request.Availability != nil {
 		existingProduct.Availability = *Request.Availability
+	}
+
+	if existingProduct.OfferAmount > existingProduct.Price {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "offer price cannot be greater than actual price",
+		})
+		return
 	}
 
 	if Request.CategoryID != 0 {

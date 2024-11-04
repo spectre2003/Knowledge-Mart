@@ -57,6 +57,23 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
+	var seller models.Seller
+	if err := database.DB.Where("id = ?", Product.SellerID).First(&seller).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "Failed to fetch seller information.",
+		})
+		return
+	}
+
+	if UserIDStr == seller.UserID {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "failed",
+			"message": "you cant buy your own product",
+		})
+		return
+	}
+
 	if !Product.Availability {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "failed",

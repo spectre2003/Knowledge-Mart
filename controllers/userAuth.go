@@ -98,15 +98,21 @@ func GoogleHandleCallback(c *gin.Context) {
 		return
 	}
 
+	var refCode string
+
 	var existingUser models.User
+
 	if err := database.DB.Where("email = ?", googleUser.Email).First(&existingUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
+			refCode = utils.GenerateRandomString(5)
+
 			newUser := models.User{
-				Email:       googleUser.Email,
-				Name:        googleUser.Name,
-				Picture:     googleUser.Picture,
-				LoginMethod: "google",
-				IsVerified:  true,
+				Email:        googleUser.Email,
+				Name:         googleUser.Name,
+				Picture:      googleUser.Picture,
+				LoginMethod:  "google",
+				IsVerified:   true,
+				ReferralCode: refCode,
 			}
 			if err := database.DB.Create(&newUser).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -122,6 +128,11 @@ func GoogleHandleCallback(c *gin.Context) {
 				"message": "failed to fetch user from database",
 			})
 			return
+		}
+	} else {
+		if existingUser.ReferralCode == "" {
+			existingUser.ReferralCode = utils.GenerateRandomString(5)
+			database.DB.Save(&existingUser)
 		}
 	}
 
