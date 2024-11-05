@@ -737,15 +737,40 @@ func CancelOrder(c *gin.Context) {
 			return
 		}
 
-		if orderItem.Status == models.OrderStatusCanceled {
-			c.JSON(http.StatusBadRequest, gin.H{
+		var order models.Order
+		if err := tx.Where("order_id = ?", orderId).First(&order).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusNotFound, gin.H{
 				"status":  "failed",
-				"message": "this item is already cancelled",
+				"message": "order not found",
 			})
 			return
 		}
 
 		orders.FinalAmount -= orderItem.FinalAmount
+		orderItemAmount := orderItem.FinalAmount
+
+		var coupon models.CouponInventory
+		if order.CouponDiscountAmount != 0 {
+			if err := tx.Where("coupon_code = ?", order.CouponCode).First(&coupon).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"status":  "failed",
+					"message": "coupon not found",
+				})
+				return
+			}
+			if coupon.MinimumAmount > order.FinalAmount {
+				orderItemAmount -= order.CouponDiscountAmount
+				if orderItemAmount < 0 {
+					orderItemAmount = orderItemAmount * -1
+					orders.FinalAmount += orderItemAmount
+					orderItemAmount = 0
+				}
+
+			}
+
+		}
+
 		if err := tx.Model(&orders).Update("final_amount", orders.FinalAmount).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -766,7 +791,7 @@ func CancelOrder(c *gin.Context) {
 		}
 
 		if orders.PaymentStatus == models.PaymentStatusPaid {
-			err := RefundToUser(tx, id, orderId, orderItem.FinalAmount, "Single item canceled", isSeller)
+			err := RefundToUser(tx, id, orderId, orderItemAmount, "Single item canceled", isSeller)
 			if err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -775,6 +800,14 @@ func CancelOrder(c *gin.Context) {
 				})
 				return
 			}
+		}
+
+		if orderItem.Status == models.OrderStatusCanceled {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "failed",
+				"message": "this item is already cancelled",
+			})
+			return
 		}
 
 		orderItem.Status = models.OrderStatusCanceled
