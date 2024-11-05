@@ -196,7 +196,7 @@ type CouponInventory struct {
 	Percentage            uint    `validate:"required" json:"percentage"`
 	MaximumUsage          uint    `validate:"required" json:"maximum_usage"`
 	MinimumAmount         float64 `validate:"required" json:"minimum_amount"`
-	MaximumDiscountAmount float64 `validate:"required" json:"maximum_discount_amount"`
+	MaximumDiscountAmount float64 `json:"maximum_discount_amount" binding:"required"`
 }
 
 type CouponUsage struct {
