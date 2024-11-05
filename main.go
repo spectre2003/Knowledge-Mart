@@ -1,8 +1,9 @@
 package main
 
 import (
-	"knowledgeMart/config"
+	database "knowledgeMart/config"
 	"knowledgeMart/routes"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,11 +14,13 @@ func main() {
 	router := gin.Default()
 
 	routes.RegisterRoutes(router)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	err := router.Run(":8080")
+	err := router.Run(":" + port)
 	if err != nil {
 		panic(err)
 	}
 }
-
-//askj dfbz vejp fgeg
